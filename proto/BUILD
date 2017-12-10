@@ -11,3 +11,13 @@ cc_library(
         "@com_google_protobuf//:protobuf",
     ],
 )
+
+cc_library(
+    name = "text",
+    srcs = ["text.cc"],
+    hdrs = ["text.h"],
+    deps = [
+        "//base",
+        "@com_google_protobuf//:protobuf",
+    ],
+)
