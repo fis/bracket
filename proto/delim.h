@@ -6,6 +6,17 @@
 
 namespace proto {
 
+class DelimReader {
+ public:
+  DelimReader(const char* path);
+  ~DelimReader();
+  bool Read(google::protobuf::Message* message, bool merge = false);
+
+ private:
+  int fd_;
+  google::protobuf::io::FileInputStream in_;
+};
+
 class DelimWriter {
  public:
   DelimWriter(const char* path);
@@ -15,12 +26,6 @@ class DelimWriter {
  private:
   int fd_;
   google::protobuf::io::FileOutputStream out_;
-
-  int OpenFd(const char* path);
-};
-
-class DelimReader {
-  // TODO implement
 };
 
 } // namespace proto
