@@ -1,3 +1,7 @@
+package(
+    default_visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "base",
     srcs = [
@@ -13,7 +17,6 @@ cc_library(
         "log.h",
         "owner_set.h",
     ],
-    visibility = ["//visibility:public"],
 )
 
 cc_library(
@@ -25,5 +28,4 @@ cc_library(
     deps = [
         ":base",
     ],
-    visibility = ["//visibility:public"],
 )
