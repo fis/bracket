@@ -2,43 +2,32 @@
 #include <cstdlib>
 
 #include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
 
 #include "base/exc.h"
 #include "proto/delim.h"
-
-extern "C" {
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-}
+#include "proto/util.h"
 
 namespace proto {
 
-namespace {
+DelimReader::DelimReader(google::protobuf::io::ZeroCopyInputStream* stream, bool owned)
+    : stream_(stream), owned_(owned)
+{}
 
-int OpenFd(const char* path, bool write) {
-  int fd = open(path, write ? O_WRONLY | O_CREAT : O_RDONLY, 0644);
-  if (fd == -1) {
-    std::string error("open: ");
-    error += path;
-    throw base::Exception(error, errno);
-  }
-  return fd;
-}
-
-} // unnamed namespace
-
-DelimReader::DelimReader(const char* path) : fd_(OpenFd(path, false)), in_(fd_) {}
+DelimReader::DelimReader(const char* path)
+    : DelimReader(OpenFileInputStream(path))
+{}
 
 DelimReader::~DelimReader() {
-  in_.Close();
+  if (owned_)
+    delete stream_;
 }
 
 bool DelimReader::Read(google::protobuf::Message* message, bool merge) {
   if (!merge)
     message->Clear();
 
-  google::protobuf::io::CodedInputStream coded(&in_);
+  google::protobuf::io::CodedInputStream coded(stream_);
 
   google::protobuf::uint64 size;
   if (!coded.ReadVarint64(&size))
@@ -53,17 +42,28 @@ bool DelimReader::Read(google::protobuf::Message* message, bool merge) {
   return success; // TODO: distinguish EOF from errors
 }
 
-DelimWriter::DelimWriter(const char* path) : fd_(OpenFd(path, true)), out_(fd_) {}
+DelimWriter::DelimWriter(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
+    : stream_(stream), owned_(owned), file_(nullptr)
+{}
+
+DelimWriter::DelimWriter(const char* path)
+    : DelimWriter(nullptr, /* owned: */ false)
+{
+  file_ = OpenFileOutputStream(path).release();
+  stream_ = file_;
+  owned_ = true;
+}
 
 DelimWriter::~DelimWriter() {
-  out_.Close();
+  if (owned_)
+    delete stream_;
 }
 
 void DelimWriter::Write(const google::protobuf::Message& message) {
   const std::size_t size = message.ByteSizeLong();
 
   {
-    google::protobuf::io::CodedOutputStream coded(&out_);
+    google::protobuf::io::CodedOutputStream coded(stream_);
 
     coded.WriteVarint64(size);
 
@@ -77,7 +77,8 @@ void DelimWriter::Write(const google::protobuf::Message& message) {
       throw base::Exception("DelimWriter::Write failed");
   }
 
-  out_.Flush();
+  if (file_)
+    file_->Flush();
 }
 
 } // namespace proto

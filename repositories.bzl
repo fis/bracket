@@ -3,7 +3,8 @@
 def zemlib_repositories(
     omit_boringssl=False,
     omit_com_google_googletest=False,
-    omit_com_google_protobuf=False):
+    omit_com_google_protobuf=False,
+    omit_org_brotli=False):
   """Imports dependencies for zemlib."""
   if not omit_boringssl:
     boringssl()
@@ -11,6 +12,8 @@ def zemlib_repositories(
     com_google_googletest()
   if not omit_com_google_protobuf:
     com_google_protobuf()
+  if not omit_org_brotli:
+    org_brotli()
 
 # boringssl (master-with-bazel @ e1fef81e, https://github.com/google/boringssl/commit/e1fef81e)
 
@@ -41,4 +44,20 @@ def com_google_protobuf():
       urls = ["https://github.com/google/protobuf/archive/ae55fd2cc52849004de21a7e26aed7bfe393eaed.zip"],
       strip_prefix = "protobuf-ae55fd2cc52849004de21a7e26aed7bfe393eaed",
       sha256 = "80e30ede3cdb3170f10e8ad572a0db934b5129a8d956f949ed80e430c62f8e00",
+  )
+
+# brotli (v1.0.2)
+
+def org_brotli():
+  native.http_archive(
+      name = "org_brotli",
+      urls = ["https://github.com/google/brotli/archive/v1.0.2.tar.gz"],
+      strip_prefix = "brotli-1.0.2",
+      sha256 = "c2cf2a16646b44771a4109bb21218c8e2d952babb827796eb8a800c1f94b7422",
+  )
+  # brotli deps
+  native.git_repository(
+      name = "io_bazel_rules_go",
+      remote = "https://github.com/bazelbuild/rules_go.git",
+      tag = "0.5.5",
   )

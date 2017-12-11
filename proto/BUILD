@@ -3,19 +3,31 @@ package(
 )
 
 cc_library(
+    name = "brotli",
+    srcs = ["brotli.cc"],
+    hdrs = ["brotli.h"],
+    deps = [
+        ":util",
+        "@com_google_protobuf//:protobuf",
+        "@org_brotli//:brotlidec",
+    ],
+)
+
+cc_library(
     name = "delim",
     srcs = ["delim.cc"],
     hdrs = ["delim.h"],
     deps = [
+        ":util",
         "//base",
         "@com_google_protobuf//:protobuf",
     ],
 )
 
 cc_library(
-    name = "text",
-    srcs = ["text.cc"],
-    hdrs = ["text.h"],
+    name = "util",
+    srcs = ["util.cc"],
+    hdrs = ["util.h"],
     deps = [
         "//base",
         "@com_google_protobuf//:protobuf",
