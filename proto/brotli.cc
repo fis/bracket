@@ -93,7 +93,7 @@ bool BrotliInputStream::Next(const void** data, int* size) {
 }
 
 void BrotliInputStream::BackUp(int count) {
-  // TODO: DCHECK(data_ - &data_buffer_[0] >= count)
+  CHECK(data_ - &data_buffer_[0] >= count);
   data_ -= count;
   byte_count_ -= count;
 }

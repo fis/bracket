@@ -1,3 +1,7 @@
+/** \file
+ * Protobuf input stream for brotli decompression.
+ */
+
 #ifndef PROTO_BROTLI_H_
 #define PROTO_BROTLI_H_
 
@@ -12,18 +16,30 @@
 
 namespace proto {
 
+/** Wrapper input stream for transparent brotli decompression. */
 class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
  public:
+  /** Constructs a wrapped file input stream. */
   static std::unique_ptr<BrotliInputStream> FromFile(const char* path);
 
+  /**
+   * Wraps \p stream with a brotli decompressor.
+   *
+   * If \p owned is `true`, the stream will be destroyed when this object is.
+   */
   BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* stream, bool owned);
+  /** Wraps \p stream with a brotli decompressor, taking ownership of it. */
   BrotliInputStream(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
       : BrotliInputStream(stream.release(), /* owned: */ true) {}
   ~BrotliInputStream();
 
+  /** Implements google::protobuf::io::ZeroCopyInputStream::Next(). */
   bool Next(const void** data, int* size) override;
+  /** Implements google::protobuf::io::ZeroCopyInputStream::BackUp(). */
   void BackUp(int count) override;
+  /** Implements google::protobuf::io::ZeroCopyInputStream::Skip(). */
   bool Skip(int count) override;
+  /** Implements google::protobuf::io::ZeroCopyInputStream::ByteCount(). */
   google::protobuf::int64 ByteCount() const override;
 
  private:
