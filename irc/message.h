@@ -1,3 +1,7 @@
+/** \file
+ * IRC protocol message type.
+ */
+
 #ifndef IRC_MESSAGE_H_
 #define IRC_MESSAGE_H_
 
@@ -84,9 +88,12 @@ class Message {
   /** Returns the contents of the argument \p at. */
   const std::string& arg(int at) const { return args_.at(at); }
 
+  /** Returns the nick portion of the prefix, if it's in the `nick!user@host` form. */
   std::string_view prefix_nick() const;
 
+  /** Returns true if the command field matches (ASCII-case-insensitive) \p test. */
   bool command_is(const char* test) const { return EqualArg(command_.data(), test); }
+  /** Returns true if argument \p n exists and matches (ASCII-case-insensitive) \p test. */
   bool arg_is(unsigned n, const char* test) const { return n < args_.size() && EqualArg(args_[n].data(), test); }
 
  private:

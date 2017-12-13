@@ -1,3 +1,7 @@
+/** \file
+ * Plain and TLS socket integration for event::Loop.
+ */
+
 #ifndef EVENT_SOCKET_H_
 #define EVENT_SOCKET_H_
 
@@ -9,39 +13,15 @@
 
 namespace event {
 
-/** Asynchronous (optionally TLS-enabled) socket. */
+/**
+ * Asynchronous (plain or TLS) socket.
+ *
+ * See the Socket::Builder class for information on how to configure and instantiate sockets.
+ */
 class Socket {
  public:
   struct Watcher;
   struct Builder;
-
-#if 0
-  /**
-   * Creates a new socket and starts connecting to \p host (at \p port).
-   *
-   * \param loop event::Loop object, which must outlive this socket
-   * \param watcher callback object for receiving status information
-   * \param host host name or numeric address
-   * \param port port number or service name
-   */
-  static std::unique_ptr<Socket> Create(Loop* loop, Watcher* watcher, const std::string& host, const std::string& port);
-
-  /**
-   * Creates a new TLS socket and starts connecting to \p host (at \p port).
-   *
-   * Note that TLS sockets have certain requirements in how they can be used. In particular, you
-   * must issue Read() and Write() calls only in response to Watcher::CanRead() and
-   * Watcher::CanWrite() callbacks, in order for the implementation to properly handle transparent
-   * renegotiation. You may issue a StartRead() or StartWrite() even when there is a pending
-   * operation, but the corresponding callbacks may be delayed.
-   *
-   * \param loop event::Loop object, which must outlive this socket
-   * \param watcher callback object for receiving status information
-   * \param host host name or numeric address
-   * \param port port number or service name
-   */
-  static std::unique_ptr<Socket> CreateTls(Loop* loop, Watcher* watcher, const std::string& host, const std::string& port);
-#endif
 
   DISALLOW_COPY(Socket);
   virtual ~Socket();
@@ -142,21 +122,41 @@ struct Socket::Watcher : public virtual base::Callback {
   virtual void CanWrite() = 0;
 };
 
-/** Class for setting arguments for a socket. */
+namespace internal {
+class BasicSocket;
+class TlsSocket;
+} // namespace internal
 
-struct Socket::Builder {
+/** Options to construct a socket. */
+class Socket::Builder {
+ public:
+  /**
+   * Instantiates a socket using the currently set options.
+   *
+   * At least the loop(), watcher(), host() and port() options need to be set.
+   */
   std::unique_ptr<Socket> Build();
 
+  /** Sets event loop to register the socket on (mandatory, must outlive the socket). */
   Builder& loop(Loop* v) { loop_ = v; return *this; }
+  /** Sets the callback object to use for events on the socket (mandatory, must outlive the socket). */
   Builder& watcher(Socket::Watcher* v) { watcher_ = v; return *this; }
+  /** Sets the host name to connect to (mandatory). */
   Builder& host(const std::string& v) { host_ = v; return *this; }
+  /** Sets the port number or service name to connect to (mandatory). */
   Builder& port(const std::string& v) { port_ = v; return *this; }
+  /** Enables or disables TLS on the resulting socket. */
   Builder& tls(bool v) { tls_ = v; return *this; }
+  /** Sets the file name to read a client certificate from. */
   Builder& client_cert(const std::string& v) { client_cert_ = v; return *this; }
+  /** Sets the file name to read a client private key from. */
   Builder& client_key(const std::string& v) { client_key_ = v; return *this; }
+  /** Overrides the default name resolution timeout. */
   Builder& resolve_timeout_ms(int v) { if (v) resolve_timeout_ms_ = v; return *this; }
+  /** Overrides the default connect timeout. */
   Builder& connect_timeout_ms(int v) { if (v) connect_timeout_ms_ = v; return *this; }
 
+ private:
   Loop* loop_ = nullptr;
   Socket::Watcher* watcher_ = nullptr;
   std::string host_ = "";
@@ -166,6 +166,9 @@ struct Socket::Builder {
   std::string client_key_ = "";
   int resolve_timeout_ms_ = 30000;
   int connect_timeout_ms_ = 60000;
+
+  friend class internal::BasicSocket;
+  friend class internal::TlsSocket;
 };
 
 } // namespace event

@@ -1,3 +1,7 @@
+/** \file
+ * IRC connection library.
+ */
+
 #ifndef IRC_CONNECTION_H_
 #define IRC_CONNECTION_H_
 
@@ -60,7 +64,9 @@ constexpr std::size_t kMaxMessageSize = 512;
  */
 class Connection : public event::Socket::Watcher {
  public:
+  /** Callback interface for incoming messages on the connection. */
   struct Reader : public virtual base::Callback {
+    /** Called when a new IRC message has been received. */
     virtual void MessageReceived(const Message& message) = 0;
   };
 

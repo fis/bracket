@@ -1,5 +1,5 @@
 /** \file
- * Implementation of length-delimited protobuf streams.
+ * Length-delimited protobuf streams.
  *
  * The format is exceedingly simple: a varint-encoded message length, followed by the corresponding
  * serialized message bytes, and then the same for the next message and so on.

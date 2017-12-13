@@ -1,5 +1,5 @@
 /** \file
- * Simple logging facility.
+ * Logging.
  */
 
 #ifndef BASE_LOG_H_

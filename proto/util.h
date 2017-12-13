@@ -1,5 +1,5 @@
 /** \file
- * Utility functions for dealing with protobufs.
+ * Utility functions for dealing with protos.
  */
 
 #ifndef PROTO_UTIL_H_

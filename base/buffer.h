@@ -1,5 +1,5 @@
 /** \file
- * Tools for simple byte buffers.
+ * Byte buffers and ring buffers.
  */
 
 #ifndef BASE_BUFFER_H_

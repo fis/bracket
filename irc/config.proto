@@ -2,33 +2,54 @@ syntax = "proto3";
 
 package irc;
 
+// IRC connection configuration.
 message Config {
+  // IRC server settings.
   message Server {
+    // Host name (required).
     string host = 1;
+    // Port number or service name (required).
     string port = 2;
+    // Password to use when logging in.
     string password = 3;
+    // TLS settings for the connection.
     TlsConfig tls = 4;
   }
 
+  // Network name (informative).
   string network = 1;
 
+  // List of servers to attempt to connect to (at least one required).
   repeated Server servers = 2;
 
+  // Common password for all servers.
   string password = 3;
+  // Common TLS settings for all servers.
   TlsConfig tls = 4;
 
+  // Preferred nick name.
   string nick = 5;
+  // User name for registration.
   string user = 6;
+  // Real name for registration.
   string realname = 7;
 
+  // List of channels to join automatically after connecting.
   repeated string channels = 8;
 
+  // Override for name resolution timeout.
   int32 resolve_timeout_ms = 9;
+  // Override for connect timeout.
   int32 connect_timeout_ms = 10;
+  // Override for delay between reconnection attempts.
   int32 reconnect_delay_ms = 11;
 }
 
+// TLS settings.
+// The presence of this message (even if empty) turns TLS on.
 message TlsConfig {
+  // Client certificate file name.
   string client_cert = 1;
+  // Client private key file name.
   string client_key = 2;
 }
