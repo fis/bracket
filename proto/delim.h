@@ -26,10 +26,10 @@ class DelimReader {
    */
   DelimReader(google::protobuf::io::ZeroCopyInputStream* stream, bool owned);
   /** Constructs a reader from \p stream, taking ownership of it. */
-  DelimReader(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
+  explicit DelimReader(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
       : DelimReader(stream.release(), /* owned: */ true) {}
   /** Constructs a reader from a file. */
-  DelimReader(const char* path);
+  explicit DelimReader(const char* path);
   ~DelimReader();
 
   /**
@@ -57,7 +57,7 @@ class DelimWriter {
    */
   DelimWriter(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned);
   /** Constructs a writer into \p stream, taking ownership of it. */
-  DelimWriter(std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
+  explicit DelimWriter(std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
       : DelimWriter(stream.release(), /* owned: */ true) {}
   /**
    * Constructs a writer into a file.
@@ -65,7 +65,7 @@ class DelimWriter {
    * The file will be opened as if by OpenFileOutputStream(), i.e., it will be created if necessary
    * and opened in append mode.
    */
-  DelimWriter(const char* path);
+  explicit DelimWriter(const char* path);
   ~DelimWriter();
 
   /** Writes \p message into the stream. */

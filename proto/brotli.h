@@ -29,7 +29,7 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
    */
   BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* stream, bool owned);
   /** Wraps \p stream with a brotli decompressor, taking ownership of it. */
-  BrotliInputStream(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
+  explicit BrotliInputStream(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
       : BrotliInputStream(stream.release(), /* owned: */ true) {}
   ~BrotliInputStream();
 
