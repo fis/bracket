@@ -1,3 +1,7 @@
+/** \file
+ * Deregister-on-destroy callbacks.
+ */
+
 #ifndef BASE_CALLBACK_H_
 #define BASE_CALLBACK_H_
 
@@ -204,6 +208,7 @@ class CallbackSet : public internal::CallbackContainer {
     callback->RegisterContainer(this, holder->second.callback);
   }
 
+  /** Removes a callback from the set. */
   bool Remove(Iface* callback) {
     auto holder = callbacks_.extract(callback);
     if (!holder)
@@ -347,18 +352,6 @@ class CallbackMap : public internal::CallbackContainer {
       node.mapped().first->UnregisterContainer(this);
     return true;
   }
-
-  /**
-   * Calls \p f with each callback in the set.
-   *
-   * \tparam F callable type suitable to be called as `f(Iface*)`
-   * \param f callback object
-   */
-  // template<typename F>
-  // void For(F f) {
-  //   for (CallbackHolder* callback : callbacks_)
-  //     f(callback->callback);
-  // }
 
   /**
    * Calls one of the callback interface methods on the callback for \p key.

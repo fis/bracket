@@ -1,3 +1,7 @@
+/** \file
+ * Set of owned pointers.
+ */
+
 #ifndef BASE_POINTER_SET_H_
 #define BASE_POINTER_SET_H_
 

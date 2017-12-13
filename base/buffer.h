@@ -1,3 +1,7 @@
+/** \file
+ * Tools for simple byte buffers.
+ */
+
 #ifndef BASE_BUFFER_H_
 #define BASE_BUFFER_H_
 
@@ -45,12 +49,10 @@ class RingBuffer {
   /**
    * Allocates space for \p push_size bytes in the queue.
    *
-   * The caller is responsible for writing some data. Of the two
-   * BufferView objects that are returned, the first one is always
-   * valid, and has a size between 1 and \p push_size. The second
-   * BufferView is only valid if the first one is smaller than the
-   * requested size, in which case *its* size will be `push_size -
-   * first.size`. This happens when the requested range crosses the
+   * The caller is responsible for writing some data. Of the two BufferView objects that are
+   * returned, the first one is always valid, and has a size between 1 and \p push_size. The second
+   * BufferView is only valid if the first one is smaller than the requested size, in which case
+   * *its* size will be `push_size - first.size`. This happens when the requested range crosses the
    * wrap-around point of the buffer.
    */
   std::pair<BufferView, BufferView> Push(BufferSize push_size);
@@ -69,14 +71,12 @@ class RingBuffer {
   /**
    * Deallocates storage from the end of the buffer.
    *
-   * This method can be used to Push() something for which you know an
-   * upper bound, but not the exact size. Call Push() with the upper
-   * bound size, write your contents, and then Unpush() the remaining
-   * space.
+   * This method can be useful if you need to Push() something for which you know an upper bound,
+   * but not the exact size. Call Push() with the upper bound size, write your contents, and then
+   * Unpush() the remaining space.
    *
-   * Be aware that Push will ensure there is sufficient free space for
-   * the entire length. Only use this approach if the upper bound is
-   * relatively tight.
+   * Be aware that the Push() call will ensure there is sufficient free space for the entire length,
+   * potentially allocating memory. Only use this approach if the upper bound is relatively tight.
    */
   void Unpush(BufferSize size) {
     CHECK(size <= used_);
@@ -87,9 +87,8 @@ class RingBuffer {
   /**
    * Returns a view to the first \p size bytes of the queue.
    *
-   * The argument must be at most #size(). As with Push(), the first
-   * returned view is always valid, and the second one only if the
-   * boundary is crossed. `first.size + second.size` will be equal to
+   * The argument must be at most #size(). As with Push(), the first returned view is always valid,
+   * and the second one only if the boundary is crossed. `first.size + second.size` will be equal to
    * the requested size.
    */
   std::pair<BufferView, BufferView> Front(BufferSize size) {

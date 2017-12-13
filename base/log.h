@@ -1,3 +1,7 @@
+/** \file
+ * Simple logging facility.
+ */
+
 #ifndef BASE_LOG_H_
 #define BASE_LOG_H_
 

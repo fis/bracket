@@ -1,3 +1,7 @@
+/** \file
+ * Compile-time maps from (dense) enums.
+ */
+
 #ifndef BASE_ENUMARRAY_H_
 #define BASE_ENUMARRAY_H_
 
@@ -9,13 +13,11 @@ namespace base {
 /**
  * An array for mapping (dense) enumeration constants to a type.
  *
- * This type is expected to be used in constexpr declarations, in
- * which case it will turn into the raw bytes of an array of \p T of
- * length \p N.
+ * This type is expected to be used in constexpr declarations, in which case it will turn into the
+ * raw bytes of an array of \p T of length \p N.
  *
- * \p N should be one more than the highest-valued constant of \p
- * Enum. Including higher values in the array initializer will be
- * detected at compile time, but looking them up will not.
+ * \p N should be one more than the highest-valued constant of \p Enum. Including higher values in
+ * the array initializer will be detected at compile time, but looking them up will not.
  */
 template <typename Enum, typename T, int N>
 struct EnumArray {
@@ -24,8 +26,7 @@ struct EnumArray {
   /**
    * Constructs a new array from a list of { constant, value } pairs.
    *
-   * If the \p def argument is provided, uninitialized elements will
-   * be set to that value.
+   * If the \p def argument is provided, uninitialized elements will be set to that value.
    */
   constexpr EnumArray(std::initializer_list<std::pair<Enum, T>> data, T def=T()) : items{def} {
     for (int i = 1; i < N; i++)

@@ -1,3 +1,11 @@
+/** \file
+ * Implementation for handling a set of timers backed by a single `timerfd`.
+ *
+ * This file should be included only by the `.cc` file in your project
+ * that adapts the low-level base/timer.h interface. If you're using
+ * event::Loop, that should be the only user of this file.
+ */
+
 #include <cerrno>
 
 #include "base/exc.h"

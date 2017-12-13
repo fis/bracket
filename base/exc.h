@@ -1,3 +1,7 @@
+/** \file
+ * Base class for exceptions, with `errno` handling.
+ */
+
 #ifndef BASE_EXC_H_
 #define BASE_EXC_H_
 
