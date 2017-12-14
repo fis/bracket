@@ -1,3 +1,3 @@
-workspace(name = "zemlib")
-load("//:repositories.bzl", "zemlib_repositories")
-zemlib_repositories()
+workspace(name = "fi_zem_bracket")
+load("//:repositories.bzl", "bracket_repositories")
+bracket_repositories()

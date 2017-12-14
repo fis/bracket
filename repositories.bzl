@@ -1,11 +1,11 @@
-"""External dependencies for zemlib."""
+"""External dependencies for the bracket library."""
 
-def zemlib_repositories(
+def bracket_repositories(
     omit_boringssl=False,
     omit_com_google_googletest=False,
     omit_com_google_protobuf=False,
     omit_org_brotli=False):
-  """Imports dependencies for zemlib."""
+  """Imports dependencies for bracket."""
   if not omit_boringssl:
     boringssl()
   if not omit_com_google_googletest:
@@ -55,7 +55,7 @@ def org_brotli():
       strip_prefix = "brotli-1.0.2",
       sha256 = "c2cf2a16646b44771a4109bb21218c8e2d952babb827796eb8a800c1f94b7422",
   )
-  # brotli deps
+  # brotli build extension dependency
   native.git_repository(
       name = "io_bazel_rules_go",
       remote = "https://github.com/bazelbuild/rules_go.git",
