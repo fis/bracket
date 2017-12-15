@@ -88,6 +88,8 @@ class owner_set {
   /** Returns an iterator to the end of the set. */
   decltype(auto) end() { return data_.end(); }
 
+  /** Returns the number of items owned by the set. */
+  std::size_t size() const noexcept { return data_.size(); }
   /** Returns `true` if the set owns no items. */
   bool empty() const noexcept { return data_.empty(); }
 

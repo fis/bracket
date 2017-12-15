@@ -29,3 +29,9 @@ cc_library(
         ":base",
     ],
 )
+
+load("//tools:gtest.bzl", "cc_gtest")
+
+cc_gtest(name = "buffer_test", deps = [":base"])
+cc_gtest(name = "enumarray_test", deps = [":base"])
+cc_gtest(name = "owner_set_test", deps = [":base"])
