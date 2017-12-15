@@ -21,6 +21,12 @@ namespace base {
 
 namespace internal {
 
+/**
+ * Default implementation of the TimerFd interface.
+ *
+ * The implementation is based on the Linux `timerfd_create(2)` system call, using the
+ * `CLOCK_MONOTONIC` clock.
+ */
 class DefaultTimerFd : public TimerFd {
  public:
   DefaultTimerFd();
@@ -62,28 +68,31 @@ void DefaultTimerFd::Wait() {
 
 } // namespace internal
 
+/** Base class for objects holding information about timer requests. */
 template <typename PeriodicT, typename OneshotT>
 struct Timer<PeriodicT, OneshotT>::Request {
-  TimerPoint target;
-  bool periodic;
+  TimerPoint target;  ///< Time when this timer next elapses.
+  bool periodic;      ///< `true` if the timer is periodic.
   explicit Request(TimerPoint target, bool periodic) : target(target), periodic(periodic) {}
   virtual ~Request() = default;
   DISALLOW_COPY(Request);
 };
 
+/** Periodic timer request. */
 template <typename PeriodicT, typename OneshotT>
 struct Timer<PeriodicT, OneshotT>::PeriodicRequest : public Timer<PeriodicT, OneshotT>::Request {
-  TimerDuration rate;
-  PeriodicT data;
+  TimerDuration rate;  ///< Repeat rate (period) of this timer.
+  PeriodicT data;      ///< Data associated with this timer.
 
   template <typename... Args>
   explicit PeriodicRequest(TimerPoint target, TimerDuration rate, Args&&... args)
       : Request(target, true), rate(rate), data(std::forward<Args>(args)...) {}
 };
 
+/** One-shot timer request. */
 template <typename PeriodicT, typename OneshotT>
 struct Timer<PeriodicT, OneshotT>::OneshotRequest : public Timer<PeriodicT, OneshotT>::Request {
-  OneshotT data;
+  OneshotT data;  ///< Data associated with this timer.
 
   template <typename... Args>
   explicit OneshotRequest(TimerPoint target, Args&&... args)

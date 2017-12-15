@@ -43,8 +43,9 @@ inline std::string ErrnoMessage(int errno_value) {
   return message;
 }
 
-// Basic TCP socket.
-
+/**
+ * Plain TCP socket.
+ */
 class BasicSocket : public Socket, public FdReader, public FdWriter {
  public:
   BasicSocket(const Socket::Builder& opt);
@@ -423,8 +424,9 @@ std::size_t BasicSocket::Write(void* buf, std::size_t count) {
   return ret;
 }
 
-// BoringSSL TLS socket.
-
+/**
+ * BoringSSL TLS socket.
+ */
 class TlsSocket : public Socket, public Socket::Watcher {
  public:
   TlsSocket(const Socket::Builder& opt);
@@ -466,8 +468,16 @@ class TlsSocket : public Socket, public Socket::Watcher {
   void WatchWrite(bool watch);
 };
 
+/** Exception type for TLS library errors. */
 class TlsException : public Socket::Exception {
  public:
+  /**
+   * Initializes a TLS exception.
+   *
+   * \param what error description
+   * \param tls_error TLS library error code
+   * \param ret TLS library function return code
+   */
   explicit TlsException(const std::string& what, int tls_error = SSL_ERROR_SSL, int ret = -1);
 
  private:

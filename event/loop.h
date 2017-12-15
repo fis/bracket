@@ -55,6 +55,7 @@ struct FdWriter : public virtual base::Callback {
 
 /** Interface for registering timers. */
 struct Timed : public virtual base::Callback {
+  /** Called when the timer elapses. */
   virtual void TimerExpired(bool periodic) = 0;
 };
 
@@ -82,8 +83,11 @@ using TimerId = base::TimerId<base::CallbackSet<Timed>, base::CallbackPtr<Timed>
 /** Sentinel value that refers to no timer. */
 constexpr TimerId kNoTimer = nullptr;
 
+/** Alias for base::TimerClock. */
 using TimerClock = base::TimerClock;
+/** Alias for base::TimerPoint. */
 using TimerPoint = base::TimerPoint;
+/** Alias for base::TimerDuration. */
 using TimerDuration = base::TimerDuration;
 
 /**

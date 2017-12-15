@@ -14,10 +14,12 @@ namespace event {
 
 namespace internal {
 
+/** Client event data sent over the pipe. */
 struct ClientEventData {
-  ClientId id;
-  Client::Data data;
+  ClientId id;        ///< Client event identifier.
+  Client::Data data;  ///< Payload data.
   ClientEventData() = default;
+  /** Initializes client event data with id \p i and payload \p d. */
   ClientEventData(ClientId i, Client::Data d) : id(i), data(d) {}
 };
 
