@@ -24,13 +24,15 @@ BrotliInputStream::BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* 
 {}
 
 BrotliInputStream::~BrotliInputStream() {
+  if (stream_chunk_available_ > 0)
+    stream_->BackUp(stream_chunk_available_);
   if (owned_)
     delete stream_;
-  else if (stream_chunk_available_ > 0)
-    stream_->BackUp(stream_chunk_available_);
 }
 
 bool BrotliInputStream::Next(const void** data, int* size) {
+  /// \todo remove buffer resizing, trust that brotli lib can cope
+
   // decompress data, unless there's some pending from a BackUp call
 
   while (data_ == data_end_) {
@@ -113,8 +115,105 @@ bool BrotliInputStream::Skip(int count) {
   return true;
 }
 
-google::protobuf::int64 BrotliInputStream::ByteCount() const {
-  return byte_count_;
+std::unique_ptr<BrotliOutputStream> BrotliOutputStream::ToFile(const char* path) {
+  return std::make_unique<BrotliOutputStream>(OpenFileOutputStream(path));
+}
+
+BrotliOutputStream::BrotliOutputStream(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
+    : stream_(stream), owned_(owned),
+      stream_chunk_(nullptr), stream_chunk_available_(0),
+      data_buffer_(kInitialBufferSize), data_used_(0),
+      byte_count_(0),
+      brotli_(BrotliEncoderCreateInstance(nullptr, nullptr, nullptr))
+{}
+
+BrotliOutputStream::~BrotliOutputStream() {
+  Finish();
+  if (owned_)
+    delete stream_;
+}
+
+bool BrotliOutputStream::Next(void** data, int* size) {
+  if (data_used_ > 0) {
+    if (!Compress(&data_buffer_[0], data_used_))
+      return false;
+  }
+
+  data_used_ = data_buffer_.size();
+
+  byte_count_ += data_used_;
+
+  *data = &data_buffer_[0];
+  *size = data_used_;
+  return true;
+}
+
+void BrotliOutputStream::BackUp(int count) {
+  CHECK(count >= 0 && data_used_ >= (std::size_t)count);
+  data_used_ -= count;
+  byte_count_ -= count;
+}
+
+bool BrotliOutputStream::WriteAliasedRaw(const void* data, int size) {
+  if (data_used_ > 0) {
+    if (!Compress(&data_buffer_[0], data_used_))
+      return false;
+    data_used_ = 0;
+  }
+  return Compress(static_cast<const std::uint8_t*>(data), size);
+}
+
+bool BrotliOutputStream::Finish() {
+  if (data_used_ > 0) {
+    if (!Compress(&data_buffer_[0], data_used_))
+      return false;
+    data_used_ = 0;
+  }
+
+  do {
+    const std::uint8_t* data = &data_buffer_[0];  // docs unclear if next_in can be nullptr
+    EnsureOutputAvailable();
+    if (!BrotliEncoderCompressStream(
+            brotli_.get(), BROTLI_OPERATION_FINISH,
+            &data_used_, &data,
+            &stream_chunk_available_, &stream_chunk_,
+            nullptr))
+      return false;
+  } while (BrotliEncoderHasMoreOutput(brotli_.get()));
+
+  if (stream_chunk_available_ > 0)
+    stream_->BackUp(stream_chunk_available_);
+  stream_chunk_ = nullptr;
+  stream_chunk_available_ = 0;
+  return true;
+}
+
+bool BrotliOutputStream::Compress(const std::uint8_t* data, std::size_t size) {
+  while (size > 0) {
+    EnsureOutputAvailable();
+    if (!BrotliEncoderCompressStream(
+            brotli_.get(), BROTLI_OPERATION_PROCESS,
+            &size, &data,
+            &stream_chunk_available_, &stream_chunk_,
+            nullptr))
+      return false;
+  }
+
+  return true;
+}
+
+bool BrotliOutputStream::EnsureOutputAvailable() {
+  while (stream_chunk_available_ == 0) {
+    void *chunk;
+    int size;
+    if (!stream_->Next(&chunk, &size))
+      return false;  // error during output
+    if (size == 0)
+      continue;      // try again to get some actual space
+    stream_chunk_ = static_cast<std::uint8_t*>(chunk);
+    stream_chunk_available_ = size;
+  }
+  return true;
 }
 
 } // namespace proto

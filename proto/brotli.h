@@ -10,6 +10,7 @@
 #include <vector>
 
 #include <brotli/decode.h>
+#include <brotli/encode.h>
 
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/stubs/common.h>
@@ -40,7 +41,7 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   /** Implements google::protobuf::io::ZeroCopyInputStream::Skip(). */
   bool Skip(int count) override;
   /** Implements google::protobuf::io::ZeroCopyInputStream::ByteCount(). */
-  google::protobuf::int64 ByteCount() const override;
+  google::protobuf::int64 ByteCount() const override { return byte_count_; }
 
  private:
   google::protobuf::io::ZeroCopyInputStream* stream_;
@@ -48,6 +49,14 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
 
   const std::uint8_t* stream_chunk_;
   std::size_t stream_chunk_available_;
+
+  // data_buffer (pre/postcondition):
+  // [  returned  |  available  |  unused  ]
+  //              ^- data       ^- data_end
+  // data_space = data_buffer.size() - data_end
+  // - returned: uncompressed data returned from Next
+  // - available: uncompressed data available (BackUp was called)
+  // - unused: scratch space
 
   std::vector<std::uint8_t> data_buffer_;
   std::uint8_t* data_;
@@ -63,6 +72,71 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   };
   using BrotliDecoderStatePtr = std::unique_ptr<BrotliDecoderState, BrotliDecoderStateDeleter>;
   BrotliDecoderStatePtr brotli_;
+};
+
+
+/** Wrapper output stream for transparent brotli compression. */
+class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
+ public:
+  /** Constructs a wrapped file output stream. */
+  static std::unique_ptr<BrotliOutputStream> ToFile(const char* path);
+
+  /**
+   * Wraps \p stream with a brotli compressor.
+   *
+   * If \p owned is `true`, the stream will be destroyed when this object is.
+   */
+  BrotliOutputStream(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned);
+  /** Wraps \p stream with a brotli decompressor, taking ownership of it. */
+  explicit BrotliOutputStream(std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
+      : BrotliOutputStream(stream.release(), /* owned: */ true) {}
+  ~BrotliOutputStream();
+
+  /** Implements google::protobuf::io::ZeroCopyOutputStream::Next(). */
+  bool Next(void** data, int* size) override;
+  /** Implements google::protobuf::io::ZeroCopyOutputStream::BackUp(). */
+  void BackUp(int count) override;
+  /** Implements google::protobuf::io::ZeroCopyOutputStream::ByteCount(). */
+  google::protobuf::int64 ByteCount() const override { return byte_count_; }
+  // TODO: docs
+  bool WriteAliasedRaw(const void* data, int size) override;
+  bool AllowsAliasing() const override { return true; }
+
+  /**
+   * Ensures all data written so far has been passed to the underlying stream.
+   *
+   * You must not try to write anything more.
+   */
+  bool Finish();
+
+ private:
+  google::protobuf::io::ZeroCopyOutputStream* stream_;
+  bool owned_;
+
+  std::uint8_t* stream_chunk_;
+  std::size_t stream_chunk_available_;
+
+  // data_buffer (pre/postcondition):
+  // [  returned  |  unused  ]
+  // |------------| = data_used
+  // - returned: given to client for writing from Next
+  // - unused: scratch space
+
+  std::vector<std::uint8_t> data_buffer_;
+  std::size_t data_used_;
+
+  google::protobuf::int64 byte_count_;
+
+  struct BrotliEncoderStateDeleter {
+    void operator()(BrotliEncoderState* state) {
+      BrotliEncoderDestroyInstance(state);
+    }
+  };
+  using BrotliEncoderStatePtr = std::unique_ptr<BrotliEncoderState, BrotliEncoderStateDeleter>;
+  BrotliEncoderStatePtr brotli_;
+
+  bool Compress(const std::uint8_t* data, std::size_t size);
+  bool EnsureOutputAvailable();
 };
 
 } // namespace proto

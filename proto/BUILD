@@ -10,6 +10,7 @@ cc_library(
         ":util",
         "@com_google_protobuf//:protobuf",
         "@org_brotli//:brotlidec",
+        "@org_brotli//:brotlienc",
     ],
 )
 
@@ -31,5 +32,16 @@ cc_library(
     deps = [
         "//base",
         "@com_google_protobuf//:protobuf",
+    ],
+)
+
+load("//tools:gtest.bzl", "cc_gtest")
+
+cc_gtest(
+    name = "brotli_test",
+    deps = [
+        ":brotli",
+        ":delim",
+        "//proto/testing:test_cc_proto",
     ],
 )
