@@ -12,6 +12,7 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 }
 
 namespace proto {
@@ -45,16 +46,15 @@ std::unique_ptr<google::protobuf::io::FileOutputStream> OpenFileOutputStream(con
 }
 
 void ReadText(const char* path, google::protobuf::Message* message) {
-  int fd = open(path, O_RDONLY);
-  if (fd == -1) {
-    std::string error("unable to open config file: ");
-    error += path;
-    throw base::Exception(error, errno);
-  }
-
+  int fd = OpenFd(path, /* write: */ false);
   google::protobuf::io::FileInputStream stream(fd);
-  if (!google::protobuf::TextFormat::Parse(&stream, message)) {
-    std::string error("unable to parse config file: ");
+  bool success = google::protobuf::TextFormat::Parse(&stream, message);
+  close(fd);
+
+  if (!success) {
+    std::string error("unable to parse proto ");
+    error += message->GetDescriptor()->full_name();
+    error += " from: ";
     error += path;
     throw base::Exception(error);
   }
