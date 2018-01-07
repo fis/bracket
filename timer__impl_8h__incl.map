@@ -1,0 +1,7 @@
+<map id="base/timer_impl.h" name="base/timer_impl.h">
+<area shape="rect" id="node3" href="$exc_8h.html" title="Base class for exceptions, with errno handling. " alt="" coords="124,155,211,181"/>
+<area shape="rect" id="node7" href="$log_8h.html" title="Logging. " alt="" coords="319,80,402,107"/>
+<area shape="rect" id="node10" href="$timer_8h.html" title="Interface for handling a set of timers backed by a single timerfd. " alt="" coords="527,80,621,107"/>
+<area shape="rect" id="node15" href="$common_8h.html" title="Common utilities used by everything. " alt="" coords="737,229,851,256"/>
+<area shape="rect" id="node16" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="826,155,951,181"/>
+</map>

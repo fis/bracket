@@ -1,0 +1,7 @@
+<map id="event::FdReader" name="event::FdReader">
+<area shape="rect" id="node3" href="$structevent_1_1FdReaderM.html" title="Callback member function pointer adapter for FdReader. " alt="" coords="363,5,518,47"/>
+<area shape="rect" id="node4" href="$classevent_1_1internal_1_1BasicSocket.html" title="Plain TCP socket. " alt="" coords="347,71,534,98"/>
+<area shape="rect" id="node5" href="$structevent_1_1FdReaderM.html" title="event::FdReaderM\&lt; event\l::Loop, &amp;Loop::ReadClientEvent \&gt;" alt="" coords="329,123,552,164"/>
+<area shape="rect" id="node6" href="$structevent_1_1FdReaderM.html" title="event::FdReaderM\&lt; event\l::Loop, &amp;Loop::ReadTimer \&gt;" alt="" coords="347,188,534,229"/>
+<area shape="rect" id="node2" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="5,101,115,127"/>
+</map>

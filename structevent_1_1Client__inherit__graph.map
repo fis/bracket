@@ -1,0 +1,6 @@
+<map id="event::Client" name="event::Client">
+<area shape="rect" id="node3" href="$classevent_1_1ClientLong.html" title="event::ClientLong\&lt;\l event::internal::BasicSocket,\l &amp;BasicSocket::Resolved \&gt;" alt="" coords="307,5,501,61"/>
+<area shape="rect" id="node4" href="$classevent_1_1ClientLong.html" title="Callback member function adapter for Client (with integer data). " alt="" coords="338,86,470,127"/>
+<area shape="rect" id="node5" href="$classevent_1_1ClientPtr.html" title="Callback member function adapter for Client (with pointer data). " alt="" coords="335,151,473,193"/>
+<area shape="rect" id="node2" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="5,93,115,120"/>
+</map>

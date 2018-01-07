@@ -1,0 +1,4 @@
+<map id="event::Socket" name="event::Socket">
+<area shape="rect" id="node2" href="$classevent_1_1internal_1_1BasicSocket.html" title="Plain TCP socket. " alt="" coords="5,80,192,107"/>
+<area shape="rect" id="node3" href="$classevent_1_1internal_1_1TlsSocket.html" title="BoringSSL TLS socket. " alt="" coords="216,80,387,107"/>
+</map>

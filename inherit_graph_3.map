@@ -1,0 +1,5 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classevent_1_1Socket_1_1Exception.html" title="Exception class for indicating socket I/O errors. " alt="" coords="5,5,175,32"/>
+<area shape="rect" id="node2" href="$classbase_1_1Exception.html" title="Base exception with a string message and an optional POSIX errno value. " alt="" coords="259,5,375,32"/>
+<area shape="rect" id="node3" href="$classevent_1_1internal_1_1TlsException.html" title="Exception type for TLS library errors. " alt="" coords="223,56,411,83"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="event::ClientPtr&lt; T, C, method &gt;" name="event::ClientPtr&lt; T, C, method &gt;">
+<area shape="rect" id="node2" href="$structevent_1_1Client.html" title="Interface for reacting to events triggered from another thread. " alt="" coords="26,80,122,107"/>
+<area shape="rect" id="node3" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="19,5,129,32"/>
+</map>

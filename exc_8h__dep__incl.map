@@ -1,0 +1,18 @@
+<map id="base/exc.h" name="base/exc.h">
+<area shape="rect" id="node2" href="$log_8h.html" title="Logging. " alt="" coords="575,80,657,107"/>
+<area shape="rect" id="node10" href="$loop_8cc_source.html" title="event/loop.cc" alt="" coords="749,304,849,331"/>
+<area shape="rect" id="node11" href="$socket_8h.html" title="Plain and TLS socket integration for event::Loop. " alt="" coords="275,304,383,331"/>
+<area shape="rect" id="node14" href="$timer__impl_8h.html" title="Implementation for handling a set of timers backed by a single timerfd. " alt="" coords="843,155,968,181"/>
+<area shape="rect" id="node16" href="$delim_8cc_source.html" title="proto/delim.cc" alt="" coords="893,80,997,107"/>
+<area shape="rect" id="node17" href="$util_8cc_source.html" title="proto/util.cc" alt="" coords="1021,80,1112,107"/>
+<area shape="rect" id="node3" href="$buffer_8h.html" title="Byte buffers and ring buffers. " alt="" coords="97,155,196,181"/>
+<area shape="rect" id="node6" href="$connection_8cc_source.html" title="irc/connection.cc" alt="" coords="39,453,161,480"/>
+<area shape="rect" id="node7" href="$client_8cc_source.html" title="irc/testing/client.cc" alt="" coords="490,453,622,480"/>
+<area shape="rect" id="node8" href="$callback_8h.html" title="Deregister&#45;on&#45;destroy callbacks. " alt="" coords="314,155,427,181"/>
+<area shape="rect" id="node13" href="$log_8cc_source.html" title="base/log.cc" alt="" coords="451,155,541,181"/>
+<area shape="rect" id="node15" href="$brotli_8cc_source.html" title="proto/brotli.cc" alt="" coords="565,155,667,181"/>
+<area shape="rect" id="node4" href="$buffer_8cc_source.html" title="base/buffer.cc" alt="" coords="94,229,199,256"/>
+<area shape="rect" id="node5" href="$connection_8h.html" title="IRC connection library. " alt="" coords="201,379,316,405"/>
+<area shape="rect" id="node9" href="$loop_8h.html" title="Asynchronous event loop. " alt="" coords="509,229,603,256"/>
+<area shape="rect" id="node12" href="$socket_8cc_source.html" title="event/socket.cc" alt="" coords="361,379,476,405"/>
+</map>

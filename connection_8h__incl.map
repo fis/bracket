@@ -1,0 +1,12 @@
+<map id="irc/connection.h" name="irc/connection.h">
+<area shape="rect" id="node5" href="$buffer_8h.html" title="Byte buffers and ring buffers. " alt="" coords="70,155,169,181"/>
+<area shape="rect" id="node14" href="$callback_8h.html" title="Deregister&#45;on&#45;destroy callbacks. " alt="" coords="645,229,759,256"/>
+<area shape="rect" id="node20" href="$common_8h.html" title="Common utilities used by everything. " alt="" coords="1125,379,1239,405"/>
+<area shape="rect" id="node23" href="$loop_8h.html" title="Asynchronous event loop. " alt="" coords="750,155,843,181"/>
+<area shape="rect" id="node30" href="$socket_8h.html" title="Plain and TLS socket integration for event::Loop. " alt="" coords="556,80,664,107"/>
+<area shape="rect" id="node32" href="$message_8h.html" title="IRC protocol message type. " alt="" coords="193,155,297,181"/>
+<area shape="rect" id="node7" href="$log_8h.html" title="Logging. " alt="" coords="113,304,195,331"/>
+<area shape="rect" id="node11" href="$exc_8h.html" title="Base class for exceptions, with errno handling. " alt="" coords="185,379,272,405"/>
+<area shape="rect" id="node21" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="738,304,863,331"/>
+<area shape="rect" id="node28" href="$timer_8h.html" title="Interface for handling a set of timers backed by a single timerfd. " alt="" coords="1069,229,1164,256"/>
+</map>

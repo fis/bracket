@@ -1,0 +1,9 @@
+<map id="event/socket.h" name="event/socket.h">
+<area shape="rect" id="node3" href="$callback_8h.html" title="Deregister&#45;on&#45;destroy callbacks. " alt="" coords="600,155,713,181"/>
+<area shape="rect" id="node15" href="$exc_8h.html" title="Base class for exceptions, with errno handling. " alt="" coords="124,304,211,331"/>
+<area shape="rect" id="node20" href="$loop_8h.html" title="Asynchronous event loop. " alt="" coords="917,80,1010,107"/>
+<area shape="rect" id="node10" href="$common_8h.html" title="Common utilities used by everything. " alt="" coords="1033,304,1147,331"/>
+<area shape="rect" id="node11" href="$log_8h.html" title="Logging. " alt="" coords="279,229,362,256"/>
+<area shape="rect" id="node18" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="795,229,921,256"/>
+<area shape="rect" id="node26" href="$timer_8h.html" title="Interface for handling a set of timers backed by a single timerfd. " alt="" coords="1105,155,1200,181"/>
+</map>

@@ -1,0 +1,6 @@
+<map id="event::internal::BasicSocket" name="event::internal::BasicSocket">
+<area shape="rect" id="node2" href="$classevent_1_1Socket.html" title="Asynchronous (plain or TLS) socket. " alt="" coords="5,80,108,107"/>
+<area shape="rect" id="node3" href="$structevent_1_1FdReader.html" title="Interface for observing file descriptors ready to read. " alt="" coords="132,80,251,107"/>
+<area shape="rect" id="node4" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="206,5,315,32"/>
+<area shape="rect" id="node5" href="$structevent_1_1FdWriter.html" title="Interface for observing file descriptors ready to write. " alt="" coords="274,80,386,107"/>
+</map>

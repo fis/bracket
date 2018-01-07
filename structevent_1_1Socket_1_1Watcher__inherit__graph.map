@@ -1,0 +1,5 @@
+<map id="event::Socket::Watcher" name="event::Socket::Watcher">
+<area shape="rect" id="node3" href="$classevent_1_1internal_1_1TlsSocket.html" title="BoringSSL TLS socket. " alt="" coords="5,155,176,181"/>
+<area shape="rect" id="node4" href="$classirc_1_1Connection.html" title="IRC connection. " alt="" coords="201,155,311,181"/>
+<area shape="rect" id="node2" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="119,5,228,32"/>
+</map>

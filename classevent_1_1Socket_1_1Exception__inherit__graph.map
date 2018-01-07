@@ -1,0 +1,5 @@
+<map id="event::Socket::Exception" name="event::Socket::Exception">
+<area shape="rect" id="node4" href="$classevent_1_1internal_1_1TlsException.html" title="Exception type for TLS library errors. " alt="" coords="5,229,193,256"/>
+<area shape="rect" id="node2" href="$classbase_1_1Exception.html" title="Base exception with a string message and an optional POSIX errno value. " alt="" coords="41,80,157,107"/>
+<area shape="rect" id="node3" title="STL class. " alt="" coords="47,5,151,32"/>
+</map>

@@ -1,0 +1,4 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$structbase_1_1TimerFd.html" title="Interface for a timerfd instance. " alt="" coords="5,5,112,32"/>
+<area shape="rect" id="node2" href="$classbase_1_1internal_1_1DefaultTimerFd.html" title="Default implementation of the TimerFd interface. " alt="" coords="160,5,359,32"/>
+</map>

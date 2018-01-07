@@ -1,0 +1,11 @@
+<map id="base::internal::CallbackContainer" name="base::internal::CallbackContainer">
+<area shape="rect" id="node2" href="$classbase_1_1CallbackMap.html" title="Callback container holding (and optionally owning) a map from a key to a callback. " alt="" coords="229,5,371,47"/>
+<area shape="rect" id="node3" href="$classbase_1_1CallbackPtr.html" title="Callback container holding (and optionally owning) a single callback. " alt="" coords="233,71,367,112"/>
+<area shape="rect" id="node4" href="$classbase_1_1CallbackSet.html" title="Callback container holding (and optionally owning) a set of callbacks, with associated data..." alt="" coords="231,136,369,177"/>
+<area shape="rect" id="node5" href="$classbase_1_1CallbackMap.html" title="base::CallbackMap\&lt;\l ClientId, event::Client \&gt;" alt="" coords="217,201,383,243"/>
+<area shape="rect" id="node6" href="$classbase_1_1CallbackPtr.html" title="base::CallbackPtr\&lt;\l event::FdReader \&gt;" alt="" coords="233,267,367,308"/>
+<area shape="rect" id="node7" href="$classbase_1_1CallbackPtr.html" title="base::CallbackPtr\&lt;\l event::FdWriter \&gt;" alt="" coords="233,332,367,373"/>
+<area shape="rect" id="node8" href="$classbase_1_1CallbackPtr.html" title="base::CallbackPtr\&lt;\l event::Socket::Watcher \&gt;" alt="" coords="212,397,388,439"/>
+<area shape="rect" id="node9" href="$classbase_1_1CallbackPtr.html" title="base::CallbackPtr\&lt;\l Watcher \&gt;" alt="" coords="233,463,367,504"/>
+<area shape="rect" id="node10" href="$classbase_1_1CallbackSet.html" title="base::CallbackSet\&lt;\l irc::Connection::Reader \&gt;" alt="" coords="212,528,388,569"/>
+</map>

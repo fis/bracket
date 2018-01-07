@@ -1,0 +1,9 @@
+<map id="event::Timed" name="event::Timed">
+<area shape="rect" id="node3" href="$structevent_1_1TimedM.html" title="Callback member function pointer adapter for Timed. " alt="" coords="326,5,518,32"/>
+<area shape="rect" id="node4" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; event\l::internal::BasicSocket,\l &amp;BasicSocket::ConnectTimeout \&gt;" alt="" coords="309,56,535,112"/>
+<area shape="rect" id="node5" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; event\l::internal::BasicSocket,\l &amp;BasicSocket::ResolveTimeout \&gt;" alt="" coords="310,136,534,192"/>
+<area shape="rect" id="node6" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::AutojoinTimer \&gt;" alt="" coords="333,216,511,272"/>
+<area shape="rect" id="node7" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::ReconnectTimer \&gt;" alt="" coords="333,296,511,352"/>
+<area shape="rect" id="node8" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::WriteCreditTimer \&gt;" alt="" coords="333,376,511,432"/>
+<area shape="rect" id="node2" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="5,191,115,217"/>
+</map>

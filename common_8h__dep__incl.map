@@ -1,0 +1,13 @@
+<map id="base/common.h" name="base/common.h">
+<area shape="rect" id="node2" href="$callback_8h.html" title="Deregister&#45;on&#45;destroy callbacks. " alt="" coords="294,155,407,181"/>
+<area shape="rect" id="node3" href="$loop_8h.html" title="Asynchronous event loop. " alt="" coords="192,229,285,256"/>
+<area shape="rect" id="node6" href="$socket_8cc_source.html" title="event/socket.cc" alt="" coords="421,379,536,405"/>
+<area shape="rect" id="node7" href="$connection_8h.html" title="IRC connection library. " alt="" coords="235,379,349,405"/>
+<area shape="rect" id="node10" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="93,80,219,107"/>
+<area shape="rect" id="node11" href="$timer_8h.html" title="Interface for handling a set of timers backed by a single timerfd. " alt="" coords="83,155,178,181"/>
+<area shape="rect" id="node5" href="$socket_8h.html" title="Plain and TLS socket integration for event::Loop. " alt="" coords="333,304,441,331"/>
+<area shape="rect" id="node4" href="$loop_8cc_source.html" title="event/loop.cc" alt="" coords="55,304,155,331"/>
+<area shape="rect" id="node9" href="$client_8cc_source.html" title="irc/testing/client.cc" alt="" coords="127,453,259,480"/>
+<area shape="rect" id="node8" href="$connection_8cc_source.html" title="irc/connection.cc" alt="" coords="283,453,405,480"/>
+<area shape="rect" id="node12" href="$timer__impl_8h.html" title="Implementation for handling a set of timers backed by a single timerfd. " alt="" coords="43,229,168,256"/>
+</map>

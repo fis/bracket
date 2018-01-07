@@ -1,0 +1,5 @@
+<map id="event::internal::TlsSocket" name="event::internal::TlsSocket">
+<area shape="rect" id="node2" href="$classevent_1_1Socket.html" title="Asynchronous (plain or TLS) socket. " alt="" coords="5,80,108,107"/>
+<area shape="rect" id="node3" href="$structevent_1_1Socket_1_1Watcher.html" title="Callback interface for asynchronous socket IO. " alt="" coords="133,80,293,107"/>
+<area shape="rect" id="node4" href="$classbase_1_1Callback.html" title="Base class for callback interfaces. " alt="" coords="158,5,267,32"/>
+</map>

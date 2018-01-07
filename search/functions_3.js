@@ -1,0 +1,7 @@
+var searchData=
+[
+  ['delay',['Delay',['../classevent_1_1Loop.html#ab9d98563541c29f191ada9db6342d2f1',1,'event::Loop::Delay(Duration delay, Timed *callback, bool owned=false)'],['../classevent_1_1Loop.html#a2c28c831b19da6ae2da2d8320704d08b',1,'event::Loop::Delay(Duration delay, const std::function&lt; void(bool)&gt; &amp;callback)']]],
+  ['delimreader',['DelimReader',['../classproto_1_1DelimReader.html#a809cfd11a96b2db0ab97bd7f1af139db',1,'proto::DelimReader::DelimReader(google::protobuf::io::ZeroCopyInputStream *stream, bool owned)'],['../classproto_1_1DelimReader.html#a086e172cd5c351162f157b304d9349f6',1,'proto::DelimReader::DelimReader(std::unique_ptr&lt; google::protobuf::io::ZeroCopyInputStream &gt; stream)'],['../classproto_1_1DelimReader.html#a69ec5a1ea8e8c1aa345300a054d10def',1,'proto::DelimReader::DelimReader(const char *path)']]],
+  ['delimwriter',['DelimWriter',['../classproto_1_1DelimWriter.html#a8cec72b7928c3edbddd7a5bcd4e62286',1,'proto::DelimWriter::DelimWriter(google::protobuf::io::ZeroCopyOutputStream *stream, bool owned)'],['../classproto_1_1DelimWriter.html#a25f161987dd8c2beaac992edb39945cc',1,'proto::DelimWriter::DelimWriter(std::unique_ptr&lt; google::protobuf::io::ZeroCopyOutputStream &gt; stream)'],['../classproto_1_1DelimWriter.html#ae3f03f9a043ae3a5b147a6a7e9214875',1,'proto::DelimWriter::DelimWriter(const char *path)']]],
+  ['detachcallback',['DetachCallback',['../classbase_1_1Callback.html#a57a854a0c80028c02584d370bd59340e',1,'base::Callback']]]
+];

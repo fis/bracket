@@ -1,0 +1,6 @@
+<map id="base/callback.h" name="base/callback.h">
+<area shape="rect" id="node8" href="$common_8h.html" title="Common utilities used by everything. " alt="" coords="323,155,438,181"/>
+<area shape="rect" id="node9" href="$log_8h.html" title="Logging. " alt="" coords="723,80,806,107"/>
+<area shape="rect" id="node16" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="342,80,467,107"/>
+<area shape="rect" id="node13" href="$exc_8h.html" title="Base class for exceptions, with errno handling. " alt="" coords="876,155,963,181"/>
+</map>

@@ -1,0 +1,23 @@
+<map id="base::Callback" name="base::Callback">
+<area shape="rect" id="node2" href="$structevent_1_1Client.html" title="Interface for reacting to events triggered from another thread. " alt="" coords="195,127,291,153"/>
+<area shape="rect" id="node6" href="$structevent_1_1FdReader.html" title="Interface for observing file descriptors ready to read. " alt="" coords="183,341,302,368"/>
+<area shape="rect" id="node11" href="$structevent_1_1FdWriter.html" title="Interface for observing file descriptors ready to write. " alt="" coords="187,253,299,280"/>
+<area shape="rect" id="node12" href="$structevent_1_1Socket_1_1Watcher.html" title="Callback interface for asynchronous socket IO. " alt="" coords="163,465,323,492"/>
+<area shape="rect" id="node15" href="$structevent_1_1Timed.html" title="Interface for registering timers. " alt="" coords="193,672,292,699"/>
+<area shape="rect" id="node22" href="$structirc_1_1Connection_1_1Reader.html" title="Callback interface for incoming messages on the connection. " alt="" coords="163,723,323,749"/>
+<area shape="rect" id="node3" href="$classevent_1_1ClientLong.html" title="event::ClientLong\&lt;\l event::internal::BasicSocket,\l &amp;BasicSocket::Resolved \&gt;" alt="" coords="386,5,581,61"/>
+<area shape="rect" id="node4" href="$classevent_1_1ClientLong.html" title="Callback member function adapter for Client (with integer data). " alt="" coords="417,86,549,127"/>
+<area shape="rect" id="node5" href="$classevent_1_1ClientPtr.html" title="Callback member function adapter for Client (with pointer data). " alt="" coords="415,151,552,193"/>
+<area shape="rect" id="node7" href="$structevent_1_1FdReaderM.html" title="Callback member function pointer adapter for FdReader. " alt="" coords="406,269,561,310"/>
+<area shape="rect" id="node8" href="$classevent_1_1internal_1_1BasicSocket.html" title="Plain TCP socket. " alt="" coords="390,217,577,244"/>
+<area shape="rect" id="node9" href="$structevent_1_1FdReaderM.html" title="event::FdReaderM\&lt; event\l::Loop, &amp;Loop::ReadClientEvent \&gt;" alt="" coords="372,334,595,375"/>
+<area shape="rect" id="node10" href="$structevent_1_1FdReaderM.html" title="event::FdReaderM\&lt; event\l::Loop, &amp;Loop::ReadTimer \&gt;" alt="" coords="390,399,577,441"/>
+<area shape="rect" id="node13" href="$classevent_1_1internal_1_1TlsSocket.html" title="BoringSSL TLS socket. " alt="" coords="398,465,569,492"/>
+<area shape="rect" id="node14" href="$classirc_1_1Connection.html" title="IRC connection. " alt="" coords="428,516,539,543"/>
+<area shape="rect" id="node16" href="$structevent_1_1TimedM.html" title="Callback member function pointer adapter for Timed. " alt="" coords="387,567,579,593"/>
+<area shape="rect" id="node17" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; event\l::internal::BasicSocket,\l &amp;BasicSocket::ConnectTimeout \&gt;" alt="" coords="371,617,596,673"/>
+<area shape="rect" id="node18" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; event\l::internal::BasicSocket,\l &amp;BasicSocket::ResolveTimeout \&gt;" alt="" coords="371,697,595,753"/>
+<area shape="rect" id="node19" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::AutojoinTimer \&gt;" alt="" coords="394,777,573,833"/>
+<area shape="rect" id="node20" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::ReconnectTimer \&gt;" alt="" coords="394,857,573,913"/>
+<area shape="rect" id="node21" href="$structevent_1_1TimedM.html" title="event::TimedM\&lt; irc\l::Connection, &amp;Connection\l::WriteCreditTimer \&gt;" alt="" coords="394,937,573,993"/>
+</map>

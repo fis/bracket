@@ -1,0 +1,5 @@
+<map id="base::Exception" name="base::Exception">
+<area shape="rect" id="node3" href="$classevent_1_1Socket_1_1Exception.html" title="Exception class for indicating socket I/O errors. " alt="" coords="15,155,184,181"/>
+<area shape="rect" id="node2" title="STL class. " alt="" coords="47,5,151,32"/>
+<area shape="rect" id="node4" href="$classevent_1_1internal_1_1TlsException.html" title="Exception type for TLS library errors. " alt="" coords="5,229,193,256"/>
+</map>

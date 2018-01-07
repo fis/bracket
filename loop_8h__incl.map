@@ -1,0 +1,8 @@
+<map id="event/loop.h" name="event/loop.h">
+<area shape="rect" id="node11" href="$callback_8h.html" title="Deregister&#45;on&#45;destroy callbacks. " alt="" coords="540,80,654,107"/>
+<area shape="rect" id="node16" href="$common_8h.html" title="Common utilities used by everything. " alt="" coords="217,229,332,256"/>
+<area shape="rect" id="node25" href="$timer_8h.html" title="Interface for handling a set of timers backed by a single timerfd. " alt="" coords="182,80,276,107"/>
+<area shape="rect" id="node17" href="$log_8h.html" title="Logging. " alt="" coords="936,155,1018,181"/>
+<area shape="rect" id="node23" href="$owner__set_8h.html" title="Set of owned pointers. " alt="" coords="396,155,521,181"/>
+<area shape="rect" id="node20" href="$exc_8h.html" title="Base class for exceptions, with errno handling. " alt="" coords="1030,229,1116,256"/>
+</map>

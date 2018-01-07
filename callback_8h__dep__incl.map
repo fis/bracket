@@ -1,0 +1,9 @@
+<map id="base/callback.h" name="base/callback.h">
+<area shape="rect" id="node2" href="$loop_8h.html" title="Asynchronous event loop. " alt="" coords="155,80,248,107"/>
+<area shape="rect" id="node4" href="$socket_8h.html" title="Plain and TLS socket integration for event::Loop. " alt="" coords="55,155,163,181"/>
+<area shape="rect" id="node5" href="$socket_8cc_source.html" title="event/socket.cc" alt="" coords="5,229,120,256"/>
+<area shape="rect" id="node6" href="$connection_8h.html" title="IRC connection library. " alt="" coords="239,229,353,256"/>
+<area shape="rect" id="node3" href="$loop_8cc_source.html" title="event/loop.cc" alt="" coords="290,155,390,181"/>
+<area shape="rect" id="node8" href="$client_8cc_source.html" title="irc/testing/client.cc" alt="" coords="135,304,267,331"/>
+<area shape="rect" id="node7" href="$connection_8cc_source.html" title="irc/connection.cc" alt="" coords="291,304,413,331"/>
+</map>

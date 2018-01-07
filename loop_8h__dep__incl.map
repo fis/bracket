@@ -1,0 +1,8 @@
+<map id="event/loop.h" name="event/loop.h">
+<area shape="rect" id="node2" href="$loop_8cc_source.html" title="event/loop.cc" alt="" coords="5,80,105,107"/>
+<area shape="rect" id="node3" href="$socket_8h.html" title="Plain and TLS socket integration for event::Loop. " alt="" coords="129,80,237,107"/>
+<area shape="rect" id="node5" href="$connection_8h.html" title="IRC connection library. " alt="" coords="195,155,310,181"/>
+<area shape="rect" id="node7" href="$client_8cc_source.html" title="irc/testing/client.cc" alt="" coords="281,229,413,256"/>
+<area shape="rect" id="node4" href="$socket_8cc_source.html" title="event/socket.cc" alt="" coords="57,155,171,181"/>
+<area shape="rect" id="node6" href="$connection_8cc_source.html" title="irc/connection.cc" alt="" coords="136,229,257,256"/>
+</map>

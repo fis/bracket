@@ -1,0 +1,4 @@
+<map id="base::Timer&lt; PeriodicT, OneshotT &gt;::Request" name="base::Timer&lt; PeriodicT, OneshotT &gt;::Request">
+<area shape="rect" id="node2" href="$structbase_1_1Timer_1_1OneshotRequest.html" title="One&#45;shot timer request. " alt="" coords="216,5,417,47"/>
+<area shape="rect" id="node3" href="$structbase_1_1Timer_1_1PeriodicRequest.html" title="Periodic timer request. " alt="" coords="217,71,416,112"/>
+</map>
