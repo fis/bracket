@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package irc.bot;
+
+import "irc/config.proto";
+
+// IRC bot configuration.
+message BotConfig {
+  irc.Config irc = 1;
+  repeated string modules = 2;
+}
