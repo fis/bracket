@@ -20,30 +20,23 @@
 
 namespace irc::bot {
 
-class Bot : public PluginHost, public irc::Connection::Reader {
+namespace internal {
+
+class BotCore : public PluginHost, public irc::Connection::Reader {
  public:
-  void Run();
+  explicit BotCore(event::Loop* loop);
 
-  void Send(const Message& msg) override;
-  void MessageReceived(const irc::Message& msg) override;
-
-  event::Loop* loop() override { return loop_; }
-
-  virtual ~Bot() = default;
-
- protected:
-  explicit Bot(event::Loop* loop = nullptr);
-
-  template <typename PluginConfigProto, typename PluginClass>
-  void RegisterPlugin() {
-    plugin_registry_.try_emplace(
-        PluginConfigProto::descriptor()->full_name(),
-        [](const google::protobuf::Message& config, PluginHost* host) -> std::unique_ptr<Plugin> {
-          return std::make_unique<PluginClass>(static_cast<const PluginConfigProto&>(config), host);
-        });
+  template <typename F>
+  void RegisterPlugin(const std::string& type, F factory) {
+    plugin_registry_.try_emplace(type, factory);
   }
 
-  virtual std::unique_ptr<google::protobuf::Message> LoadConfig() = 0;
+  int Run(const google::protobuf::Message& config);
+
+  void MessageReceived(const irc::Message& msg) override;
+
+  void Send(const Message& msg) override;
+  event::Loop* loop() override { return loop_; }
 
  private:
   using PluginFactory = std::function<std::unique_ptr<Plugin>(const google::protobuf::Message& config, PluginHost* host)>;
@@ -56,20 +49,35 @@ class Bot : public PluginHost, public irc::Connection::Reader {
   std::unique_ptr<irc::Connection> irc_;
 };
 
-template <typename ConfigProto>
-class ConfiguredBot : public Bot {
- public:
-  ConfiguredBot(const char* config_file) : config_file_(config_file) {}
+} // namespace internal
 
- protected:
-  std::unique_ptr<google::protobuf::Message> LoadConfig() override {
-    auto config = std::make_unique<ConfigProto>();
-    proto::ReadText(config_file_, config.get());
-    return config;
+class Bot {
+ public:
+  explicit Bot(event::Loop* loop = nullptr) : core_(loop) {}
+
+  template <typename PluginConfigProto, typename PluginClass>
+  void RegisterPlugin() {
+    core_.RegisterPlugin(
+        PluginConfigProto::descriptor()->full_name(),
+        [](const google::protobuf::Message& config, PluginHost* host) -> std::unique_ptr<Plugin> {
+          return std::make_unique<PluginClass>(static_cast<const PluginConfigProto&>(config), host);
+        });
+  }
+
+  template <typename ConfigProto>
+  int Main(int argc, char** argv, event::Loop* loop = nullptr) {
+    if (argc != 2) {
+      LOG(ERROR) << "usage: " << argv[0] << " <bot.config>";
+      return 1;
+    }
+
+    ConfigProto config;
+    proto::ReadText(argv[1], &config);
+    return core_.Run(config);
   }
 
  private:
-  const char* config_file_;
+  internal::BotCore core_;
 };
 
 } // namespace irc::bot
