@@ -5,10 +5,7 @@
 namespace proto {
 
 namespace {
-
-constexpr std::size_t kInitialBufferSize = 4096;
 constexpr std::size_t kMaxBufferSize = 16777216;
-
 } // unnamed namespace
 
 std::unique_ptr<BrotliInputStream> BrotliInputStream::FromFile(const char* path) {
@@ -17,9 +14,6 @@ std::unique_ptr<BrotliInputStream> BrotliInputStream::FromFile(const char* path)
 
 BrotliInputStream::BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* stream, bool owned)
     : stream_(stream), owned_(owned),
-      stream_chunk_(nullptr), stream_chunk_available_(0),
-      data_buffer_(kInitialBufferSize), data_(nullptr), data_end_(nullptr), data_space_(0),
-      byte_count_(0),
       brotli_(BrotliDecoderCreateInstance(nullptr, nullptr, nullptr))
 {}
 
@@ -121,9 +115,6 @@ std::unique_ptr<BrotliOutputStream> BrotliOutputStream::ToFile(const char* path)
 
 BrotliOutputStream::BrotliOutputStream(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
     : stream_(stream), owned_(owned),
-      stream_chunk_(nullptr), stream_chunk_available_(0),
-      data_buffer_(kInitialBufferSize), data_used_(0),
-      byte_count_(0),
       brotli_(BrotliEncoderCreateInstance(nullptr, nullptr, nullptr))
 {}
 

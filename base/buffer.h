@@ -37,7 +37,7 @@ class RingBuffer {
  public:
   /** Constructs a new ring buffer. \p initial_size must be a power of 2. */
   RingBuffer(BufferSize initial_size = 4096)
-      : data_(new char[initial_size]), size_(initial_size), used_(0), first_byte_(0) {
+      : data_(new char[initial_size]), size_(initial_size) {
     CHECK(!(initial_size & (initial_size - 1)));
   }
 
@@ -130,9 +130,9 @@ class RingBuffer {
   /** Size of allocated data. */
   BufferSize size_;
   /** Number of bytes in the queue. */
-  BufferSize used_;
+  BufferSize used_ = 0;
   /** Offset of the first (earliest inserted) byte. */
-  BufferSize first_byte_;
+  BufferSize first_byte_ = 0;
 };
 
 } // namespace base

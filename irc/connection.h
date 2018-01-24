@@ -121,17 +121,19 @@ class Connection : public event::Socket::Watcher {
 
  private:
   CALLBACK_F1(ReaderF, Reader, MessageReceived, const Message&);
+  /** Maximum number of write credits. */
+  static constexpr int kMaxWriteCredit = 10000;
 
   /** IRC connection configuration proto. */
   Config config_;
   /** Currently active server in the configuration. */
-  int current_server_;
+  int current_server_ = 0;
 
   /** Looper used for scheduling and I/O. */
   event::Loop* loop_;
 
   /** Reconnect timer, active if `kIdle` after an error, but running. */
-  event::TimerId reconnect_timer_;
+  event::TimerId reconnect_timer_ = event::kNoTimer;
 
   /** Server socket. */
   std::unique_ptr<event::Socket> socket_;
@@ -149,7 +151,7 @@ class Connection : public event::Socket::Watcher {
    */
   std::array<char, 65536> read_buffer_;
   /** Amount of bytes used for an incomplete message in front of #read_buffer_. */
-  std::size_t read_buffer_used_;
+  std::size_t read_buffer_used_ = 0;
   /** Listener set for incoming messages. */
   base::CallbackSet<Reader> readers_;
   /** Most recently parsed message. */
@@ -167,16 +169,16 @@ class Connection : public event::Socket::Watcher {
    */
   std::deque<std::pair<int, int>> write_queue_;
   /** Available write credits, as of #write_credit_time_. */
-  int write_credit_;
+  int write_credit_ = kMaxWriteCredit;
   /** Time point when #write_credit_ was last updated. */
-  event::TimerPoint write_credit_time_;
+  event::TimerPoint write_credit_time_ = loop_->now();
   /** `true` if we're waiting for server socket to become ready to write. */
-  bool write_expected_;
+  bool write_expected_ = false;
   /** If we're waiting for enough credits to send, id of the timer. */
-  event::TimerId write_credit_timer_;
+  event::TimerId write_credit_timer_ = event::kNoTimer;
 
   /** Autojoin timer, active right after a connection has been established. */
-  event::TimerId autojoin_timer_;
+  event::TimerId autojoin_timer_ = event::kNoTimer;
 
   /** Called when the server socket has connected. */
   void ConnectionOpen() override;
@@ -201,9 +203,9 @@ class Connection : public event::Socket::Watcher {
   /** Callback to attempt to join channels that need to be automatically joined. */
   void AutojoinTimer();
 
-  event::TimedM<Connection, &Connection::WriteCreditTimer> write_credit_timer_callback_;
-  event::TimedM<Connection, &Connection::ReconnectTimer> reconnect_timer_callback_;
-  event::TimedM<Connection, &Connection::AutojoinTimer> autojoin_timer_callback_;
+  event::TimedM<Connection, &Connection::WriteCreditTimer> write_credit_timer_callback_{this};
+  event::TimedM<Connection, &Connection::ReconnectTimer> reconnect_timer_callback_{this};
+  event::TimedM<Connection, &Connection::AutojoinTimer> autojoin_timer_callback_{this};
 };
 
 } // namespace irc

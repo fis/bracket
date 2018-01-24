@@ -36,20 +36,11 @@ LOG_TYPE(Config::Server, log, server) {
 // Connection implementation.
 // ==========================
 
-constexpr int kMaxWriteCredit = 10000;
 constexpr int kAutojoinDelayMs = 10000;
 
 // TODO sort methods?
 
-Connection::Connection(const Config& config, event::Loop* loop)
-    : config_(), current_server_(0),
-      loop_(loop), reconnect_timer_(event::kNoTimer),
-      read_buffer_used_(0),
-      write_credit_(kMaxWriteCredit), write_credit_time_(loop->now()),
-      write_expected_(false), write_credit_timer_(event::kNoTimer),
-      autojoin_timer_(event::kNoTimer),
-      write_credit_timer_callback_(this), reconnect_timer_callback_(this),
-      autojoin_timer_callback_(this)
+Connection::Connection(const Config& config, event::Loop* loop) : loop_(loop)
 {
   // TODO: defaults from a thing
   config_.set_nick("feworitg");

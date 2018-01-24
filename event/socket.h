@@ -157,6 +157,9 @@ class Socket::Builder {
   Builder& connect_timeout_ms(int v) { if (v) connect_timeout_ms_ = v; return *this; }
 
  private:
+  static constexpr int kDefaultResolveTimeoutMs = 30000;
+  static constexpr int kDefaultConnectTimeoutMs = 60000;
+
   Loop* loop_ = nullptr;
   Socket::Watcher* watcher_ = nullptr;
   std::string host_ = "";
@@ -164,8 +167,8 @@ class Socket::Builder {
   bool tls_ = false;
   std::string client_cert_ = "";
   std::string client_key_ = "";
-  int resolve_timeout_ms_ = 30000;
-  int connect_timeout_ms_ = 60000;
+  int resolve_timeout_ms_ = kDefaultResolveTimeoutMs;
+  int connect_timeout_ms_ = kDefaultConnectTimeoutMs;
 
   friend class internal::BasicSocket;
   friend class internal::TlsSocket;

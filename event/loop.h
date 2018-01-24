@@ -43,7 +43,7 @@ struct FdReaderM : public FdReader {
   /** Object whose method will be called. */
   T* parent;
   /** Constructs a callback for object \p p, which must outlive this object. */
-  FdReaderM(T* p) : parent(p) {}
+  explicit FdReaderM(T* p) : parent(p) {}
   /** Implements FdReader::CanRead by calling the callback. */
   void CanRead(int fd) override { (parent->*method)(fd); }
 };
@@ -71,7 +71,7 @@ struct TimedM : public Timed {
   /** Object whose method will be called. */
   T* parent;
   /** Constructs a callback for object \p p, which must outlive this object. */
-  TimedM(T* p) : parent(p) {}
+  explicit TimedM(T* p) : parent(p) {}
   /** Implements Timed::TimerExpired by calling the callback. */
   void TimerExpired(bool) override { (parent->*method)(); }
 };
@@ -108,7 +108,7 @@ struct SignalM : public Signal {
   /** Object whose method will be called. */
   T* parent;
   /** Constructs a callback for object \p p, which must outlive this object. */
-  SignalM(T* p) : parent(p) {}
+  explicit SignalM(T* p) : parent(p) {}
   /** Implements Signal::SignalDelivered by calling the callback. */
   void SignalDelivered(int signal) override { (parent->*method)(signal); }
 };
@@ -284,16 +284,16 @@ class Loop {
 
   Timer timer_;
 
-  int signal_fd_;
+  int signal_fd_ = -1;
   sigset_t signal_set_;
   internal::SignalMap signal_map_;
   base::owner_set<internal::SignalRecord> signals_;
 
   base::CallbackMap<ClientId, Client> clients_;
-  ClientId next_client_id_;
-  int client_pipe_[2];
+  ClientId next_client_id_ = 1;
+  int client_pipe_[2] = {-1, -1};
 
-  bool stop_;  ///< `true` if a stop request is pending
+  bool stop_ = false;  ///< `true` if a stop request is pending
 
   TimerId Delay_(base::TimerDuration delay, Timed* callback, bool owned);
   Fd* GetFd(int fd);
@@ -303,10 +303,10 @@ class Loop {
 
   void HandleSigTerm(int) { Stop(); }
 
-  FdReaderM<Loop, &Loop::ReadTimer> read_timer_callback_;
-  FdReaderM<Loop, &Loop::ReadSignal> read_signal_callback_;
-  FdReaderM<Loop, &Loop::ReadClientEvent> read_client_event_callback_;
-  SignalM<Loop, &Loop::HandleSigTerm> handle_sigterm_callback_;
+  FdReaderM<Loop, &Loop::ReadTimer> read_timer_callback_{this};
+  FdReaderM<Loop, &Loop::ReadSignal> read_signal_callback_{this};
+  FdReaderM<Loop, &Loop::ReadClientEvent> read_client_event_callback_{this};
+  SignalM<Loop, &Loop::HandleSigTerm> handle_sigterm_callback_{this};
 };
 
 /**

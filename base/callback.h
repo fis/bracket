@@ -80,9 +80,7 @@ class Callback {
 template<typename Iface>
 class CallbackPtr : public internal::CallbackContainer {
  public:
-  explicit CallbackPtr(Iface* callback = nullptr, bool owned = false)
-      : callback_(nullptr), owned_(false)
-  {
+  explicit CallbackPtr(Iface* callback = nullptr, bool owned = false) {
     if (callback)
       Set(callback, owned);
   }
@@ -169,8 +167,8 @@ class CallbackPtr : public internal::CallbackContainer {
   bool empty() const noexcept { return !callback_; }
 
  private:
-  Iface* callback_;
-  bool owned_;
+  Iface* callback_ = nullptr;
+  bool owned_ = false;
 };
 
 /**

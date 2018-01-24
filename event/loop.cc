@@ -28,15 +28,7 @@ struct ClientEventData {
 
 Loop::Loop(PollFunc* poll, std::unique_ptr<base::TimerFd> timerfd)
     : poll_(poll),
-      timer_(std::move(timerfd)),
-      signal_fd_(-1),
-      next_client_id_(1),
-      client_pipe_{-1, -1},
-      stop_(false),
-      read_timer_callback_(this),
-      read_signal_callback_(this),
-      read_client_event_callback_(this),
-      handle_sigterm_callback_(this)
+      timer_(std::move(timerfd))
 {
   ReadFd(timer_.fd(), &read_timer_callback_);
 

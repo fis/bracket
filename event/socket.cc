@@ -104,13 +104,13 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   Loop* loop_;
   base::CallbackPtr<Watcher> watcher_;
 
-  State state_;
+  State state_ = kResolving;
 
   /** Shared state between the main and name resolution threads, only set in `kResolving` state. */
   std::shared_ptr<ResolveData> resolve_data_;
   /** Client event for posting the name resolution result. */
   /** Name resolution timeout in milliseconds. */
-  int resolve_timeout_ms_;
+  int resolve_timeout_ms_ = Socket::Builder::kDefaultResolveTimeoutMs;
   /** Timer for timing out the name resolution thread, only valid in `kResolving` state. */
   event::TimerId resolve_timer_;
 
@@ -119,17 +119,17 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Address we're currently trying to connect to, in `kConnecting` state. */
   struct addrinfo* connect_addr_;
   /** Connection timeout in milliseconds. */
-  int connect_timeout_ms_;
+  int connect_timeout_ms_ = Socket::Builder::kDefaultConnectTimeoutMs;
   /** Timer for timing out the connection attempt, only valid in `kConnecting` state. */
   event::TimerId connect_timer_;
 
   /** TCP socket, only valid (not -1) in `kOpen` state. */
-  int socket_;
+  int socket_ = -1;
 
   /** `true` if there's a read operation pending. */
-  bool read_started_;
+  bool read_started_ = false;
   /** `true` if there's a write operation pending. */
-  bool write_started_;
+  bool write_started_ = false;
 
   /**
    * Performs a blocking hostname resolution (in a separate thread).
@@ -157,18 +157,14 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Called when the underlying socket is ready to write, according to poll. */
   void CanWrite(int fd) override;
 
-  event::ClientLong<BasicSocket, &BasicSocket::Resolved> resolved_callback_;
-  event::TimedM<BasicSocket, &BasicSocket::ResolveTimeout> resolve_timeout_callback_;
-  event::TimedM<BasicSocket, &BasicSocket::ConnectTimeout> connect_timeout_callback_;
+  event::ClientLong<BasicSocket, &BasicSocket::Resolved> resolved_callback_{loop_, this};
+  event::TimedM<BasicSocket, &BasicSocket::ResolveTimeout> resolve_timeout_callback_{this};
+  event::TimedM<BasicSocket, &BasicSocket::ConnectTimeout> connect_timeout_callback_{this};
 };
 
 BasicSocket::BasicSocket(const Socket::Builder& opt)
     : loop_(opt.loop_), watcher_(opt.watcher_),
-      state_(kResolving),
-      resolve_timeout_ms_(opt.resolve_timeout_ms_), connect_timeout_ms_(opt.connect_timeout_ms_),
-      socket_(-1),
-      read_started_(false), write_started_(false),
-      resolved_callback_(opt.loop_, this), resolve_timeout_callback_(this), connect_timeout_callback_(this)
+      resolve_timeout_ms_(opt.resolve_timeout_ms_), connect_timeout_ms_(opt.connect_timeout_ms_)
 {
   LOG(DEBUG) << "Resolving host: " << opt.host_ << ':' << opt.port_;
 
@@ -453,11 +449,11 @@ class TlsSocket : public Socket, public Socket::Watcher {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<SSL> ssl_;
 
-  bool read_started_;
-  bool write_started_;
-  bool read_watched_;
-  bool write_watched_;
-  PendingOp pending_;
+  bool read_started_ = false;
+  bool write_started_ = false;
+  bool read_watched_ = false;
+  bool write_watched_ = false;
+  PendingOp pending_ = kNone;
 
   void ConnectionOpen() override;
   void ConnectionFailed(const std::string& error) override;
@@ -486,10 +482,7 @@ class TlsException : public Socket::Exception {
 
 TlsSocket::TlsSocket(const Socket::Builder& opt)
     : socket_(Socket::Builder(opt).watcher(this)),
-      watcher_(opt.watcher_),
-      read_started_(false), write_started_(false),
-      read_watched_(false), write_watched_(false),
-      pending_(kNone)
+      watcher_(opt.watcher_)
 {
   ssl_ctx_ = bssl::UniquePtr<SSL_CTX>(SSL_CTX_new(TLS_method()));
   SSL_CTX_set_mode(ssl_ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);

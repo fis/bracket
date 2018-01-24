@@ -44,11 +44,13 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   google::protobuf::int64 ByteCount() const override { return byte_count_; }
 
  private:
+  static constexpr std::size_t kInitialBufferSize = 4096;
+
   google::protobuf::io::ZeroCopyInputStream* stream_;
   bool owned_;
 
-  const std::uint8_t* stream_chunk_;
-  std::size_t stream_chunk_available_;
+  const std::uint8_t* stream_chunk_ = nullptr;
+  std::size_t stream_chunk_available_ = 0;
 
   // data_buffer (pre/postcondition):
   // [  returned  |  available  |  unused  ]
@@ -58,12 +60,12 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   // - available: uncompressed data available (BackUp was called)
   // - unused: scratch space
 
-  std::vector<std::uint8_t> data_buffer_;
-  std::uint8_t* data_;
-  std::uint8_t* data_end_;
-  std::size_t data_space_;
+  std::vector<std::uint8_t> data_buffer_ = std::vector<std::uint8_t>(kInitialBufferSize);
+  std::uint8_t* data_ = nullptr;
+  std::uint8_t* data_end_ = nullptr;
+  std::size_t data_space_ = 0;
 
-  google::protobuf::int64 byte_count_;
+  google::protobuf::int64 byte_count_ = 0;
 
   struct BrotliDecoderStateDeleter {
     void operator()(BrotliDecoderState* state) {
@@ -110,11 +112,13 @@ class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   bool Finish();
 
  private:
+  static constexpr std::size_t kInitialBufferSize = 4096;
+
   google::protobuf::io::ZeroCopyOutputStream* stream_;
   bool owned_;
 
-  std::uint8_t* stream_chunk_;
-  std::size_t stream_chunk_available_;
+  std::uint8_t* stream_chunk_ = nullptr;
+  std::size_t stream_chunk_available_ = 0;
 
   // data_buffer (pre/postcondition):
   // [  returned  |  unused  ]
@@ -122,10 +126,10 @@ class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   // - returned: given to client for writing from Next
   // - unused: scratch space
 
-  std::vector<std::uint8_t> data_buffer_;
-  std::size_t data_used_;
+  std::vector<std::uint8_t> data_buffer_ = std::vector<std::uint8_t>(kInitialBufferSize);
+  std::size_t data_used_ = 0;
 
-  google::protobuf::int64 byte_count_;
+  google::protobuf::int64 byte_count_ = 0;
 
   struct BrotliEncoderStateDeleter {
     void operator()(BrotliEncoderState* state) {
