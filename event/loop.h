@@ -20,8 +20,7 @@
 #include "base/timer.h"
 
 extern "C" {
-#include <poll.h>
-#include <signal.h>
+#include <poll.h>  // nfds_t
 }
 
 namespace event {
@@ -153,15 +152,25 @@ class Loop {
  public:
   /** Function pointer type for the implementation of `poll(2)`. */
   using PollFunc = int(struct pollfd*, nfds_t, int);
+  /** Interface for `signalfd(2)`. */
+  struct SignalFd {
+    virtual void Add(int signal) = 0;
+    virtual void Remove(int signal) = 0;
+    virtual int Read() = 0;
+    virtual int fd() const = 0;
+    virtual ~SignalFd() = default;
+  };
 
+  /** Constructs a new event loop. */
+  Loop();
   /**
-   * Constructs a new event loop structure.
+   * Constructs a new event loop for testing.
    *
-   * The \p poll and \p timerfd arguments can be used to override the poll and timer implementations
-   * used by the event loop. This is intended to be done only in tests. If not provided, the default
-   * implementations use `poll(2)` and `timerfd_create(2)` and the associated functions.
+   * The \p poll, \p timer and \p signal_fd arguments override the default implementations used by
+   * the event loop. This is intended to be done only in tests.
    */
-  Loop(PollFunc* poll = &::poll, std::unique_ptr<base::TimerFd> timerfd = std::unique_ptr<base::TimerFd>());
+  Loop(PollFunc* poll, std::unique_ptr<base::TimerFd> timer, std::unique_ptr<SignalFd> signal_fd);
+
   DISALLOW_COPY(Loop);
 
   /**
@@ -284,8 +293,7 @@ class Loop {
 
   Timer timer_;
 
-  int signal_fd_ = -1;
-  sigset_t signal_set_;
+  std::unique_ptr<SignalFd> signal_fd_;
   internal::SignalMap signal_map_;
   base::owner_set<internal::SignalRecord> signals_;
 

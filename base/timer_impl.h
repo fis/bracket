@@ -31,10 +31,10 @@ class DefaultTimerFd : public TimerFd {
  public:
   DefaultTimerFd();
   ~DefaultTimerFd() override { close(fd_); }
-  TimerPoint now() const noexcept override { return TimerClock::now(); }
-  int fd() const noexcept override { return fd_; }
   void Arm(TimerDuration delay) override;
   void Wait() override;
+  TimerPoint now() const noexcept override { return TimerClock::now(); }
+  int fd() const noexcept override { return fd_; }
 
  private:
   int fd_;

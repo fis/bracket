@@ -25,14 +25,14 @@ using TimerDuration = TimerClock::duration;
 /** Interface for a `timerfd` instance. */
 struct TimerFd {
   virtual ~TimerFd() {}
-  /** Returns the current time. */
-  virtual TimerPoint now() const noexcept = 0;
-  /** Returns the file descriptor that needs to be observed. */
-  virtual int fd() const noexcept = 0;
   /** Arms the timer to wait for \p delay. */
   virtual void Arm(TimerDuration delay) = 0;
   /** Blocks until a timer expires or a spurious wakeup occurs. */
   virtual void Wait() = 0;
+  /** Returns the current time. */
+  virtual TimerPoint now() const noexcept = 0;
+  /** Returns the file descriptor that needs to be observed. */
+  virtual int fd() const noexcept = 0;
 };
 
 /**

@@ -51,10 +51,19 @@ base::TimerPoint fake_now = base::TimerPoint(base::TimerDuration(5544332211));
 
 class FakeTimerFd : public base::TimerFd {
  public:
+  void Arm(base::TimerDuration delay) override {}
+  void Wait() override {}
   base::TimerPoint now() const noexcept override { return fake_now; }
   int fd() const noexcept override { return kFakeTimerFd; }
-  void Arm(base::TimerDuration delay) override {};
-  void Wait() override {};
+};
+
+constexpr int kFakeSignalFd = 1001;
+
+class FakeSignalFd : public Loop::SignalFd {
+  void Add(int signal) override {}
+  void Remove(int signal) override {}
+  int Read() override { return -1; }
+  int fd() const override { return kFakeSignalFd; }
 };
 
 struct MockReader : public FdReader {
@@ -70,7 +79,7 @@ struct MockTimed : public Timed {
 };
 
 struct LoopTest : public ::testing::Test {
-  LoopTest() : loop(&fake_poll, std::make_unique<FakeTimerFd>()) {
+  LoopTest() : loop(&fake_poll, std::make_unique<FakeTimerFd>(), std::make_unique<FakeSignalFd>()) {
     read_fds.clear();
     write_fds.clear();
     last_poll.clear();
