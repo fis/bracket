@@ -99,6 +99,9 @@ void Connection::Start() {
   socket_ = builder.Build();
 }
 
+void Connection::Stop() {
+}
+
 void Connection::ConnectionOpen() {
   LOG(INFO) << "Connected to " << config_.servers(current_server_);
 

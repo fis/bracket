@@ -21,6 +21,7 @@
 
 extern "C" {
 #include <poll.h>
+#include <signal.h>
 }
 
 namespace event {
@@ -90,6 +91,34 @@ using TimerPoint = base::TimerPoint;
 /** Alias for base::TimerDuration. */
 using TimerDuration = base::TimerDuration;
 
+/** Interface for registering signals. */
+struct Signal : public virtual base::Callback {
+  /** Called when a signal is delivered. */
+  virtual void SignalDelivered(int signal) = 0;
+};
+
+/**
+ * Callback member function pointer adapter for Signal.
+ *
+ * \tparam T object type the callback member function belongs to
+ * \tparam method member function pointer to the callback
+ */
+template <typename T, void (T::*method)(int)>
+struct SignalM : public Signal {
+  /** Object whose method will be called. */
+  T* parent;
+  /** Constructs a callback for object \p p, which must outlive this object. */
+  SignalM(T* p) : parent(p) {}
+  /** Implements Signal::SignalDelivered by calling the callback. */
+  void SignalDelivered(int signal) override { (parent->*method)(signal); }
+};
+
+namespace internal { struct SignalRecord; }
+/** Type for registered signal handler identifiers. */
+using SignalId = internal::SignalRecord*;
+/** Sentinel value that refers to no signal handler. */
+constexpr SignalId kNoSignal = nullptr;
+
 /**
  * Interface for reacting to events triggered from another thread.
  *
@@ -107,6 +136,17 @@ struct Client : public virtual base::Callback {
 
 /** Type for registered client event identifiers. */
 using ClientId = std::uint64_t;
+
+namespace internal {
+
+using SignalMap = std::unordered_multimap<int, SignalRecord*>;
+struct SignalRecord {
+  base::CallbackPtr<event::Signal> callback;
+  SignalMap::const_iterator map_item;
+  SignalRecord(event::Signal* cb, bool o) : callback(cb, o) {}
+};
+
+} // namespace internal
 
 /** Asynchronous event loop. */
 class Loop {
@@ -183,6 +223,15 @@ class Loop {
   void CancelTimer(TimerId timer) { timer_.Cancel(timer); }
 
   /**
+   * Registers a listener for signal \p signal.
+   */
+  SignalId AddSignal(int signal, Signal* callback, bool owned = false);
+  /**
+   * Removes a registered signal handler.
+   */
+  void RemoveSignal(SignalId signal_id);
+
+  /**
    * Adds a listener for custom events from separate threads.
    *
    * If \p owned is set, the loop takes ownership of the callback object, and will destroy it when
@@ -205,6 +254,15 @@ class Loop {
   /** Blocks until something happens, and then invokes the relevant callbacks. */
   void Poll();
 
+  /** Runs until asked to terminate (via the Stop() method). */
+  void Run() {
+    while (!stop_)
+      Poll();
+    stop_ = false;
+  }
+
+  void Stop() { stop_ = true; }
+
   /** Returns the current time of the clock used by scheduling timers. */
   base::TimerPoint now() const noexcept { return base::TimerClock::now(); /* TODO test now */ }
 
@@ -226,17 +284,29 @@ class Loop {
 
   Timer timer_;
 
+  int signal_fd_;
+  sigset_t signal_set_;
+  internal::SignalMap signal_map_;
+  base::owner_set<internal::SignalRecord> signals_;
+
   base::CallbackMap<ClientId, Client> clients_;
   ClientId next_client_id_;
   int client_pipe_[2];
 
+  bool stop_;  ///< `true` if a stop request is pending
+
   TimerId Delay_(base::TimerDuration delay, Timed* callback, bool owned);
   Fd* GetFd(int fd);
   void ReadTimer(int);
+  void ReadSignal(int);
   void ReadClientEvent(int);
 
+  void HandleSigTerm(int) { Stop(); }
+
   FdReaderM<Loop, &Loop::ReadTimer> read_timer_callback_;
+  FdReaderM<Loop, &Loop::ReadSignal> read_signal_callback_;
   FdReaderM<Loop, &Loop::ReadClientEvent> read_client_event_callback_;
+  SignalM<Loop, &Loop::HandleSigTerm> handle_sigterm_callback_;
 };
 
 /**

@@ -7,6 +7,7 @@
 #include "base/timer_impl.h"
 
 extern "C" {
+#include <sys/signalfd.h>
 #include <unistd.h>
 }
 
@@ -28,12 +29,20 @@ struct ClientEventData {
 Loop::Loop(PollFunc* poll, std::unique_ptr<base::TimerFd> timerfd)
     : poll_(poll),
       timer_(std::move(timerfd)),
+      signal_fd_(-1),
       next_client_id_(1),
       client_pipe_{-1, -1},
+      stop_(false),
       read_timer_callback_(this),
-      read_client_event_callback_(this)
+      read_signal_callback_(this),
+      read_client_event_callback_(this),
+      handle_sigterm_callback_(this)
 {
   ReadFd(timer_.fd(), &read_timer_callback_);
+
+  sigemptyset(&signal_set_);
+  AddSignal(SIGTERM, &handle_sigterm_callback_);
+  ReadFd(signal_fd_, &read_signal_callback_);
 }
 
 void Loop::ReadFd(int fd, FdReader* callback, bool owned) {
@@ -78,10 +87,43 @@ void Loop::WriteFd(int fd, FdWriter* callback, bool owned) {
   }
 }
 
-TimerId Loop::Delay_(base::TimerDuration delay, Timed* callback, bool owned) {
-  auto [timer, cb] = timer_.AddDelay(delay);
-  cb->Set(callback, owned);
-  return timer;
+SignalId Loop::AddSignal(int signal, Signal* callback, bool owned) {
+  auto other_handler = signal_map_.find(signal);
+  bool register_signal = other_handler == signal_map_.end();
+
+  internal::SignalRecord* record = signals_.emplace(callback, owned);
+  record->map_item = signal_map_.insert(other_handler, std::make_pair(signal, record));
+
+  if (register_signal) {
+    sigaddset(&signal_set_, signal);
+    signal_fd_ = signalfd(signal_fd_, &signal_set_, SFD_NONBLOCK | SFD_CLOEXEC);
+    if (signal_fd_ == -1)
+      throw base::Exception("signalfd(add)", errno);
+    int ret = sigprocmask(SIG_BLOCK, &signal_set_, nullptr);
+    if (ret == -1)
+      throw base::Exception("sigprocmask(SIG_BLOCK)", errno);
+  }
+
+  return record;
+}
+
+void Loop::RemoveSignal(SignalId signal_id) {
+  int signal = signal_id->map_item->first;
+  signal_map_.erase(signal_id->map_item);
+  signals_.erase(signal_id);
+
+  if (!signal_map_.count(signal)) {
+    sigset_t unblock_set;
+    sigemptyset(&unblock_set);
+    sigaddset(&unblock_set, signal);
+    int ret = sigprocmask(SIG_UNBLOCK, &unblock_set, nullptr);
+    if (ret == -1)
+      throw base::Exception("sigprocmask(SIG_UNBLOCK)", errno);
+    sigdelset(&signal_set_, signal);
+    signal_fd_ = signalfd(signal_fd_, &signal_set_, SFD_NONBLOCK | SFD_CLOEXEC);
+    if (signal_fd_ == -1)
+      throw base::Exception("signalfd(remove)", errno);
+  }
 }
 
 ClientId Loop::AddClient(Client* callback, bool owned) {
@@ -184,6 +226,12 @@ void Loop::Poll() {
   }
 }
 
+TimerId Loop::Delay_(base::TimerDuration delay, Timed* callback, bool owned) {
+  auto [timer, cb] = timer_.AddDelay(delay);
+  cb->Set(callback, owned);
+  return timer;
+}
+
 Loop::Fd* Loop::GetFd(int fd) {
   auto [fd_data, inserted] = fds_.try_emplace(fd);
 
@@ -201,6 +249,33 @@ void Loop::ReadTimer(int) {
       else
         oneshot->Call(&Timed::TimerExpired, false);
     });
+}
+
+void Loop::ReadSignal(int) {
+  while (true) {
+    struct signalfd_siginfo sig;
+
+    ssize_t bytes = read(signal_fd_, &sig, sizeof sig);
+    if (bytes == -1 && errno == EAGAIN)
+      break;
+    else if (bytes == -1)
+      throw base::Exception("read(signalfd)", errno);
+    else if (bytes != sizeof sig)
+      throw base::Exception("read(signalfd): short read");
+
+    int signal = sig.ssi_signo;
+
+    auto handlers = signal_map_.equal_range(signal);
+    if (handlers.first == signal_map_.end()) {
+      LOG(WARNING) << "signalfd produced an unexpected signal: " << signal;
+      continue;
+    }
+
+    // TODO: prune the signal if all the handlers were empty
+    for (auto it = handlers.first; it != handlers.second; ++it) {
+      it->second->callback.Call(&Signal::SignalDelivered, signal);
+    }
+  }
 }
 
 void Loop::ReadClientEvent(int) {

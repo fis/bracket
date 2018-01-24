@@ -53,8 +53,8 @@ int BotCore::Run(const google::protobuf::Message& config) {
   irc_ = std::make_unique<irc::Connection>(*irc_config, loop_);
   irc_->AddReader(this);
   irc_->Start();
-  while (true)
-    loop_->Poll();
+  loop_->Run();
+  return 0;
 }
 
 void BotCore::Send(const Message& msg) {

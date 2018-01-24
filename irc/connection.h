@@ -93,12 +93,14 @@ class Connection : public event::Socket::Watcher {
    */
   void Start();
 
+  // TODO: Stop() w/ a quit message -- need to figure out how to terminate.
+  void Stop();
+
   /**
    * Posts a message over the connection.
    *
-   * The message may or may not be sent immediately. If a connection
-   * has not been established, messages are always buffered
-   * internally. If there is an active connection, the message may be
+   * The message may or may not be sent immediately. If a connection has not been established,
+   * messages are always buffered internally. If there is an active connection, the message may be
    * sent immediately, unless limited by the flood protection.
    */
   void Send(const Message& message);
