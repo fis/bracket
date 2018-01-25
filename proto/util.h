@@ -37,6 +37,10 @@ std::unique_ptr<google::protobuf::io::FileOutputStream> OpenFileOutputStream(con
  * Intended use case is for things like reading a configuration file.
  */
 void ReadText(const char* path, google::protobuf::Message* message);
+/** \overload */
+static inline void ReadText(const std::string& path, google::protobuf::Message* message) {
+  ReadText(path.c_str(), message);
+}
 
 } // namespace proto
 
