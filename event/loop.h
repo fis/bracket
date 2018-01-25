@@ -157,7 +157,7 @@ class Loop {
     virtual void Add(int signal) = 0;
     virtual void Remove(int signal) = 0;
     virtual int Read() = 0;
-    virtual int fd() const = 0;
+    virtual int fd() const noexcept = 0;
     virtual ~SignalFd() = default;
   };
 

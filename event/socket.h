@@ -11,6 +11,11 @@
 #include "base/exc.h"
 #include "event/loop.h"
 
+extern "C" {
+#include <sys/types.h>
+#include <sys/socket.h>
+}
+
 namespace event {
 
 /**
@@ -20,11 +25,27 @@ namespace event {
  */
 class Socket {
  public:
+  enum Kind : int {
+    STREAM = SOCK_STREAM,
+    DGRAM = SOCK_DGRAM,
+    SEQPACKET = SOCK_SEQPACKET,
+  };
+
   struct Watcher;
   struct Builder;
 
   DISALLOW_COPY(Socket);
   virtual ~Socket();
+
+  /**
+   * Starts establishing a connection for this socket, asynchronously.
+   *
+   * This method must be only called once. Either one of the Watcher::ConnectionOpen() or
+   * Watcher::ConnectionFailed() methods will be called once in response. Normally this happens in a
+   * subsequent loop, though for a fast failure or a local socket it may be possible for the
+   * callback to be invoked during this call.
+   */
+  virtual void Start() = 0;
 
   /**
    * Initiates an asynchronous read operation.
@@ -139,13 +160,17 @@ class Socket::Builder {
 
   /** Sets event loop to register the socket on (mandatory, must outlive the socket). */
   Builder& loop(Loop* v) { loop_ = v; return *this; }
-  /** Sets the callback object to use for events on the socket (mandatory, must outlive the socket). */
+  /** Sets the callback object to use for events on the socket (mandatory, should outlive the socket). */
   Builder& watcher(Socket::Watcher* v) { watcher_ = v; return *this; }
-  /** Sets the host name to connect to (mandatory). */
+  /** Sets the host name to connect to (mandatory unless `unix` is set). */
   Builder& host(const std::string& v) { host_ = v; return *this; }
-  /** Sets the port number or service name to connect to (mandatory). */
+  /** Sets the port number or service name to connect to (mandatory unless `unix` is set). */
   Builder& port(const std::string& v) { port_ = v; return *this; }
-  /** Enables or disables TLS on the resulting socket. */
+  /** Sets the path (or abstract) name for a Unix domain socket. */
+  Builder& unix(const std::string& v) { unix_ = v; return *this; }
+  /** Sets the kind (stream, datagram, seqpacket) of the socket. The default is stream. */
+  Builder& kind(Socket::Kind v) { kind_ = v; return *this; }
+  /** Enables or disables TLS on the resulting socket. Only stream sockets are supported. */
   Builder& tls(bool v) { tls_ = v; return *this; }
   /** Sets the file name to read a client certificate from. */
   Builder& client_cert(const std::string& v) { client_cert_ = v; return *this; }
@@ -164,6 +189,8 @@ class Socket::Builder {
   Socket::Watcher* watcher_ = nullptr;
   std::string host_ = "";
   std::string port_ = "";
+  std::string unix_ = "";
+  Socket::Kind kind_ = Socket::STREAM;
   bool tls_ = false;
   std::string client_cert_ = "";
   std::string client_key_ = "";

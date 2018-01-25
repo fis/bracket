@@ -33,7 +33,7 @@ class SignalFdImpl : public Loop::SignalFd {
   void Add(int signal) override;
   void Remove(int signal) override;
   int Read() override;
-  int fd() const override { return signal_fd_; }
+  int fd() const noexcept override { return signal_fd_; }
 
  private:
   int signal_fd_ = -1;

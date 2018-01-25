@@ -15,6 +15,7 @@ extern "C" {
 #include <netdb.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <unistd.h>
 }
 
@@ -48,10 +49,13 @@ inline std::string ErrnoMessage(int errno_value) {
  */
 class BasicSocket : public Socket, public FdReader, public FdWriter {
  public:
-  BasicSocket(const Socket::Builder& opt);
+  enum Family { kInet, kUnix };
+
+  BasicSocket(const Builder& opt, Family family, Watcher* watcher);
   DISALLOW_COPY(BasicSocket);
   ~BasicSocket();
 
+  void Start() override;
   void StartRead() override;
   void StartWrite() override;
   std::size_t Read(void* buf, std::size_t count) override;
@@ -60,10 +64,12 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   void WatchRead(bool watch);
   void WatchWrite(bool watch);
 
+  // Internal interface for TlsSocket use only.
   int fd() const noexcept { return socket_; }
 
  private:
   enum State {
+    kInitialized,
     kResolving,
     kConnecting,
     kOpen,
@@ -79,9 +85,9 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   using AddrinfoPtr = std::unique_ptr<struct addrinfo, AddrinfoDeleter>;
 
   struct ResolveData {
-    /** Constructs a new resolve data block for resolving host \p h, port \p p. */
-    ResolveData(BasicSocket* s, const std::string& h, const std::string& p)
-        : socket(s), host(h), port(p)
+    /** Constructs a new resolve data block for resolving host \p h, port \p p, kind \p k. */
+    ResolveData(BasicSocket* s, const std::string& h, const std::string& p, int k)
+        : socket(s), host(h), port(p), kind(k)
     {}
 
     /**
@@ -91,6 +97,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
     BasicSocket* socket;
     const std::string host;
     const std::string port;
+    int kind;
 
     /** Pointer to a getaddrinfo(2) result list, once the results are ready. */
     AddrinfoPtr addrs;
@@ -104,7 +111,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   Loop* loop_;
   base::CallbackPtr<Watcher> watcher_;
 
-  State state_ = kResolving;
+  State state_ = kInitialized;
 
   /** Shared state between the main and name resolution threads, only set in `kResolving` state. */
   std::shared_ptr<ResolveData> resolve_data_;
@@ -114,14 +121,16 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Timer for timing out the name resolution thread, only valid in `kResolving` state. */
   event::TimerId resolve_timer_;
 
-  /** Result list from name resolution. Only valid in `kConnecting` state. */
-  AddrinfoPtr connect_addrs_;
+  /** Result list from `getaddrinfo`. Only valid in `kConnecting` state, for an inet socket. */
+  AddrinfoPtr connect_addr_inet_;
+  /** Address data built explicitly. Only valid in `kConnecting` state, for a unix socket. */
+  std::unique_ptr<std::pair<struct sockaddr_un, struct addrinfo>> connect_addr_unix_;
   /** Address we're currently trying to connect to, in `kConnecting` state. */
   struct addrinfo* connect_addr_;
   /** Connection timeout in milliseconds. */
   int connect_timeout_ms_ = Socket::Builder::kDefaultConnectTimeoutMs;
   /** Timer for timing out the connection attempt, only valid in `kConnecting` state. */
-  event::TimerId connect_timer_;
+  event::TimerId connect_timer_ = kNoTimer;
 
   /** TCP socket, only valid (not -1) in `kOpen` state. */
   int socket_ = -1;
@@ -162,15 +171,28 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   event::TimedM<BasicSocket, &BasicSocket::ConnectTimeout> connect_timeout_callback_{this};
 };
 
-BasicSocket::BasicSocket(const Socket::Builder& opt)
-    : loop_(opt.loop_), watcher_(opt.watcher_),
+BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
+    : loop_(opt.loop_), watcher_(watcher),
       resolve_timeout_ms_(opt.resolve_timeout_ms_), connect_timeout_ms_(opt.connect_timeout_ms_)
 {
-  LOG(DEBUG) << "Resolving host: " << opt.host_ << ':' << opt.port_;
+  if (family == kInet) {
+    resolve_data_ = std::make_shared<ResolveData>(this, opt.host_, opt.port_, opt.kind_);
+  } else if (family == kUnix) {
+    connect_addr_unix_ = std::make_unique<std::pair<struct sockaddr_un, struct addrinfo>>();
+    struct sockaddr_un* addr = &connect_addr_unix_->first;
+    connect_addr_ = &connect_addr_unix_->second;
 
-  resolve_data_ = std::make_shared<ResolveData>(this, opt.host_, opt.port_);
-  resolve_timer_ = loop_->Delay(std::chrono::milliseconds(resolve_timeout_ms_), &resolve_timeout_callback_);
-  std::thread(&Resolve, resolve_data_).detach();
+    addr->sun_family = AF_UNIX;
+    CHECK(opt.unix_.length() + 1 <= sizeof (addr->sun_path));
+    std::strcpy(addr->sun_path, opt.unix_.c_str());
+
+    connect_addr_->ai_family = AF_UNIX;
+    connect_addr_->ai_socktype = opt.kind_;
+    connect_addr_->ai_protocol = 0;
+    connect_addr_->ai_addrlen = sizeof (struct sockaddr_un);
+    connect_addr_->ai_addr = (struct sockaddr*) addr;
+    connect_addr_->ai_next = nullptr;
+  }
 }
 
 BasicSocket::~BasicSocket() {
@@ -190,11 +212,28 @@ BasicSocket::~BasicSocket() {
   }
 }
 
+void BasicSocket::Start() {
+  CHECK(state_ == kInitialized);
+
+  if (resolve_data_) {
+    LOG(DEBUG) << "Resolving host: " << resolve_data_->host << ':' << resolve_data_->port;
+    state_ = kResolving;
+    resolve_timer_ = loop_->Delay(std::chrono::milliseconds(resolve_timeout_ms_), &resolve_timeout_callback_);
+    std::thread(&Resolve, resolve_data_).detach();
+  } else if (connect_addr_unix_) {
+    state_ = kConnecting;
+    Connect();
+  } else {
+    state_ = kFailed;
+    watcher_.Call(&Watcher::ConnectionFailed, "internal error");
+  }
+}
+
 void BasicSocket::Resolve(std::shared_ptr<ResolveData> data) {
   struct addrinfo hints;
   std::memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_socktype = data->kind;
   hints.ai_protocol = 0;
   hints.ai_flags = AI_ADDRCONFIG;
 
@@ -219,20 +258,20 @@ void BasicSocket::Resolve(std::shared_ptr<ResolveData> data) {
 void BasicSocket::Resolved(long) {
   CHECK(state_ == kResolving);
 
-  connect_addrs_ = std::move(resolve_data_->addrs);
+  connect_addr_inet_ = std::move(resolve_data_->addrs);
   std::string error = std::move(resolve_data_->error);
   resolve_data_.reset();
   loop_->CancelTimer(resolve_timer_);
   resolve_timer_ = event::kNoTimer;
 
-  if (!connect_addrs_) {
+  if (!connect_addr_inet_) {
     state_ = kFailed;
     watcher_.Call(&Watcher::ConnectionFailed, error);
     return;
   }
 
   state_ = kConnecting;
-  connect_addr_ = connect_addrs_.get();
+  connect_addr_ = connect_addr_inet_.get();
   Connect();
 }
 
@@ -277,7 +316,8 @@ void BasicSocket::Connect() {
 void BasicSocket::ConnectDone() {
   LOG(DEBUG) << "Connected to " << *connect_addr_;
 
-  connect_addrs_.reset();
+  connect_addr_inet_.reset();
+  connect_addr_unix_.reset();
   connect_addr_ = nullptr;
 
   state_ = kOpen;
@@ -291,9 +331,9 @@ void BasicSocket::ConnectTimeout() {
 }
 
 void BasicSocket::ConnectNext(const std::string& error) {
-  if (connect_timer_) {
+  if (connect_timer_ != kNoTimer) {
     loop_->CancelTimer(connect_timer_);
-    connect_timer_ = event::kNoTimer;
+    connect_timer_ = kNoTimer;
   }
 
   if (socket_ != -1) {
@@ -425,10 +465,11 @@ std::size_t BasicSocket::Write(void* buf, std::size_t count) {
  */
 class TlsSocket : public Socket, public Socket::Watcher {
  public:
-  TlsSocket(const Socket::Builder& opt);
+  TlsSocket(const Socket::Builder& opt, BasicSocket::Family family);
   DISALLOW_COPY(TlsSocket);
   ~TlsSocket();
 
+  void Start() override;
   void StartRead() override;
   void StartWrite() override;
   std::size_t Read(void* buf, std::size_t count) override;
@@ -480,9 +521,8 @@ class TlsException : public Socket::Exception {
   std::string Describe(const std::string& what, int tls_error, int ret) const noexcept;
 };
 
-TlsSocket::TlsSocket(const Socket::Builder& opt)
-    : socket_(Socket::Builder(opt).watcher(this)),
-      watcher_(opt.watcher_)
+TlsSocket::TlsSocket(const Socket::Builder& opt, BasicSocket::Family family)
+    : socket_(opt, family, this), watcher_(opt.watcher_)
 {
   ssl_ctx_ = bssl::UniquePtr<SSL_CTX>(SSL_CTX_new(TLS_method()));
   SSL_CTX_set_mode(ssl_ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
@@ -500,6 +540,10 @@ TlsSocket::TlsSocket(const Socket::Builder& opt)
 }
 
 TlsSocket::~TlsSocket() {}
+
+void TlsSocket::Start() {
+  socket_.Start();
+}
 
 void TlsSocket::StartRead() {
   CHECK(ssl_);
@@ -709,13 +753,20 @@ Socket::~Socket() {}
 std::unique_ptr<Socket> Socket::Builder::Build() {
   CHECK(loop_);
   CHECK(watcher_);
-  CHECK(!host_.empty());
-  CHECK(!port_.empty());
+  CHECK(!tls_ || kind_ == Socket::STREAM);
+
+  internal::BasicSocket::Family family;
+  if (!host_.empty() && !port_.empty())
+    family = internal::BasicSocket::kInet;
+  else if (!unix_.empty())
+    family = internal::BasicSocket::kUnix;
+  else
+    throw base::Exception("{host, port} or unix not specified in Socket::Builder");
 
   if (tls_)
-    return std::make_unique<internal::TlsSocket>(*this);
+    return std::make_unique<internal::TlsSocket>(*this, family);
   else
-    return std::make_unique<internal::BasicSocket>(*this);
+    return std::make_unique<internal::BasicSocket>(*this, family, watcher_);
 }
 
 } // namespace event

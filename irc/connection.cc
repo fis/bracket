@@ -88,6 +88,7 @@ void Connection::Start() {
         .client_key(tls->client_key());
 
   socket_ = builder.Build();
+  socket_->Start();
 }
 
 void Connection::Stop() {
