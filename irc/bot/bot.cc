@@ -39,7 +39,7 @@ int BotCore::Run(const google::protobuf::Message& config) {
         if (field->is_repeated()) {
           FATAL("TODO: repeated plugin fields");
         } else {
-          LOG(INFO) << "Creating plugin for: " << field->message_type()->full_name();
+          LOG(INFO) << "creating plugin for: " << field->message_type()->full_name();
           auto plugin = factory->second(reflection->GetMessage(config, field), this);
           plugins_.push_back(std::move(plugin));
         }

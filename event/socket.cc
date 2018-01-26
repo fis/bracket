@@ -224,7 +224,7 @@ void BasicSocket::Start() {
   CHECK(state_ == kInitialized);
 
   if (resolve_data_) {
-    LOG(DEBUG) << "Resolving host: " << resolve_data_->host << ':' << resolve_data_->port;
+    LOG(DEBUG) << "resolving host: " << resolve_data_->host << ':' << resolve_data_->port;
     state_ = kResolving;
     resolve_timer_ = loop_->Delay(std::chrono::milliseconds(resolve_timeout_ms_), &resolve_timeout_callback_);
     std::thread(&Resolve, resolve_data_).detach();
@@ -296,7 +296,7 @@ void BasicSocket::ResolveTimeout() {
 
 void BasicSocket::Connect() {
   CHECK(connect_addr_);
-  LOG(DEBUG) << "Connecting to " << *connect_addr_;
+  LOG(DEBUG) << "connecting to " << *connect_addr_;
 
   socket_ = socket(connect_addr_->ai_family, connect_addr_->ai_socktype, connect_addr_->ai_protocol);
   if (socket_ == -1) {
@@ -322,7 +322,7 @@ void BasicSocket::Connect() {
 }
 
 void BasicSocket::ConnectDone() {
-  LOG(DEBUG) << "Connected to " << *connect_addr_;
+  LOG(DEBUG) << "connected to " << *connect_addr_;
 
   connect_addr_inet_.reset();
   connect_addr_unix_.reset();
@@ -351,7 +351,7 @@ void BasicSocket::ConnectNext(const std::string& error) {
 
   if (connect_addr_->ai_next) {
     LOG(WARNING)
-        << "Connecting to " << *connect_addr_ << " failed (" << error
+        << "connecting to " << *connect_addr_ << " failed (" << error
         << ") - trying next address";
     connect_addr_ = connect_addr_->ai_next;
     Connect();

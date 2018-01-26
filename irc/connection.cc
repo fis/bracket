@@ -54,7 +54,7 @@ Connection::Connection(const Config& config, event::Loop* loop) : loop_(loop)
 
 Connection::~Connection() {
   if (socket_)
-    LOG(WARNING) << "Active connection to " << config_.servers(current_server_) << " destroyed.";
+    LOG(WARNING) << "active connection to " << config_.servers(current_server_) << " destroyed.";
 
   if (reconnect_timer_)
     loop_->CancelTimer(reconnect_timer_);
@@ -95,7 +95,7 @@ void Connection::Stop() {
 }
 
 void Connection::ConnectionOpen() {
-  LOG(INFO) << "Connected to " << config_.servers(current_server_);
+  LOG(INFO) << "connected to " << config_.servers(current_server_);
 
   const std::string* pass = nullptr;
   if (!config_.servers(current_server_).password().empty())
@@ -152,7 +152,7 @@ void Connection::CanRead() {
         if (read_message_.Parse(start, msg_len))
           HandleMessage(read_message_);
         else
-          LOG(ERROR) << "Invalid IRC message";  /// \todo dump bytes?
+          LOG(ERROR) << "invalid IRC message";  /// \todo dump bytes?
       }
     } else {
       // hit end of buffer with an incomplete message
@@ -232,7 +232,7 @@ void Connection::Send(const Message& message) {
 
   write_queue_.emplace_back(write_size + 2, cost);
 
-  LOG(VERBOSE) << "Added " << write_size + 2 << " bytes to the write queue (cost " << cost << ')';
+  LOG(VERBOSE) << "added " << write_size + 2 << " bytes to the write queue (cost " << cost << ')';
 
   // TODO: don't try until a connection has been established
   if (was_empty)  // otherwise we're trying already
@@ -273,7 +273,7 @@ void Connection::CanWrite() {
   std::size_t wrote = 0;
 
   if (can_write > 0) {
-    LOG(VERBOSE) << "Try to write " << can_write << " bytes to server";
+    LOG(VERBOSE) << "try to write " << can_write << " bytes to server";
 
     auto data = write_buffer_.Front(can_write);
     for (const base::BufferView& slice : { data.first, data.second }) {
@@ -360,7 +360,7 @@ void Connection::ConnectionLost(const std::string& error) {
   int reconnect_delay_ms = config_.reconnect_delay_ms();
 
   LOG(WARNING)
-      << "Connection to " << server << " lost (" << error
+      << "connection to " << server << " lost (" << error
       << ") - trying next server in " << reconnect_delay_ms << " ms";
 
   current_server_ = (current_server_ + 1) % config_.servers_size();
