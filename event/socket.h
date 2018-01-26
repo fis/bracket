@@ -23,19 +23,22 @@ namespace event {
  *
  * See the Socket::Builder class for information on how to configure and instantiate sockets.
  */
-class Socket {
- public:
-  enum Kind : int {
-    STREAM = SOCK_STREAM,
-    DGRAM = SOCK_DGRAM,
-    SEQPACKET = SOCK_SEQPACKET,
-  };
-
+struct Socket {
+  enum Family : int;
+  enum Kind : int;
   struct Watcher;
   struct Builder;
 
   DISALLOW_COPY(Socket);
-  virtual ~Socket();
+  virtual ~Socket() {}
+
+  /**
+   * Resets the object that receives callbacks for this socket.
+   *
+   *  This method is mostly intended for setting the watcher when an (initially unwatched) socket is
+   *  received in a ServerSocket::Watcher::Accepted() callback.
+   */
+  virtual void SetWatcher(Watcher* watcher) = 0;
 
   /**
    * Starts establishing a connection for this socket, asynchronously.
@@ -104,7 +107,18 @@ class Socket {
   };
 
  protected:
-  Socket();
+  Socket() {}
+};
+
+enum Socket::Family : int {
+  INET,  ///< either AF_INET and AF_INET6
+  UNIX,  ///< AF_UNIX
+};
+
+enum Socket::Kind : int {
+  STREAM = SOCK_STREAM,
+  DGRAM = SOCK_DGRAM,
+  SEQPACKET = SOCK_SEQPACKET,
 };
 
 /** Callback interface for asynchronous socket IO. */
@@ -200,6 +214,33 @@ class Socket::Builder {
   friend class internal::BasicSocket;
   friend class internal::TlsSocket;
 };
+
+struct ServerSocket {
+  struct Watcher;
+
+  DISALLOW_COPY(ServerSocket);
+  virtual ~ServerSocket() {}
+
+ protected:
+  ServerSocket() {}
+};
+
+struct ServerSocket::Watcher : public virtual base::Callback {
+  /**
+   * Called when a new connection has been accepted on the server socket.
+   *
+   * The passed in Socket object is initially in open state, and has no watcher assigned. There's no
+   * need to call Socket::Start() on it. You should call Socket::SetWatcher method on it before any
+   * other asynchronous methods.
+   *
+   * The Socket::Watcher::ConnectionOpen() and Socket::Watcher::ConnectionFailed will never be
+   * called; the connection is implicitly open after it's been accepted.
+   */
+  virtual void Accepted(std::unique_ptr<Socket> socket) = 0;
+};
+
+std::unique_ptr<ServerSocket> ListenInet(Loop* loop, ServerSocket::Watcher* watcher, int port);
+std::unique_ptr<ServerSocket> ListenUnix(Loop* loop, ServerSocket::Watcher* watcher, const std::string& path, Socket::Kind kind = Socket::STREAM);
 
 } // namespace event
 

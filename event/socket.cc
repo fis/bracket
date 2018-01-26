@@ -49,11 +49,14 @@ inline std::string ErrnoMessage(int errno_value) {
  */
 class BasicSocket : public Socket, public FdReader, public FdWriter {
  public:
-  enum Family { kInet, kUnix };
-
   BasicSocket(const Builder& opt, Family family, Watcher* watcher);
+  // Internal constructor for ServerSocket use only.
+  BasicSocket(Loop* loop, int fd);
+
   DISALLOW_COPY(BasicSocket);
   ~BasicSocket();
+
+  void SetWatcher(Watcher* watcher) override { watcher_.Set(watcher); }
 
   void Start() override;
   void StartRead() override;
@@ -126,13 +129,13 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Address data built explicitly. Only valid in `kConnecting` state, for a unix socket. */
   std::unique_ptr<std::pair<struct sockaddr_un, struct addrinfo>> connect_addr_unix_;
   /** Address we're currently trying to connect to, in `kConnecting` state. */
-  struct addrinfo* connect_addr_;
+  struct addrinfo* connect_addr_ = nullptr;
   /** Connection timeout in milliseconds. */
   int connect_timeout_ms_ = Socket::Builder::kDefaultConnectTimeoutMs;
   /** Timer for timing out the connection attempt, only valid in `kConnecting` state. */
   event::TimerId connect_timer_ = kNoTimer;
 
-  /** TCP socket, only valid (not -1) in `kOpen` state. */
+  /** Socket file descriptor, only valid (not -1) in `kConnecting` or `kOpen` states. */
   int socket_ = -1;
 
   /** `true` if there's a read operation pending. */
@@ -175,15 +178,16 @@ BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
     : loop_(opt.loop_), watcher_(watcher),
       resolve_timeout_ms_(opt.resolve_timeout_ms_), connect_timeout_ms_(opt.connect_timeout_ms_)
 {
-  if (family == kInet) {
+  if (family == INET) {
     resolve_data_ = std::make_shared<ResolveData>(this, opt.host_, opt.port_, opt.kind_);
-  } else if (family == kUnix) {
+  } else if (family == UNIX) {
     connect_addr_unix_ = std::make_unique<std::pair<struct sockaddr_un, struct addrinfo>>();
     struct sockaddr_un* addr = &connect_addr_unix_->first;
     connect_addr_ = &connect_addr_unix_->second;
 
+    if (opt.unix_.length() + 1 > sizeof (addr->sun_path))
+      throw Exception("unix socket name too long: " + opt.unix_);
     addr->sun_family = AF_UNIX;
-    CHECK(opt.unix_.length() + 1 <= sizeof (addr->sun_path));
     std::strcpy(addr->sun_path, opt.unix_.c_str());
 
     connect_addr_->ai_family = AF_UNIX;
@@ -194,6 +198,10 @@ BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
     connect_addr_->ai_next = nullptr;
   }
 }
+
+BasicSocket::BasicSocket(Loop* loop, int fd)
+    : loop_(loop), state_(kOpen), socket_(fd)
+{}
 
 BasicSocket::~BasicSocket() {
   if (resolve_data_) {
@@ -392,6 +400,7 @@ void BasicSocket::CanWrite(int fd) {
 
 void BasicSocket::StartRead() {
   CHECK(!read_started_);
+  CHECK(!watcher_.empty());
 
   read_started_ = true;
   WatchRead(true);
@@ -399,6 +408,7 @@ void BasicSocket::StartRead() {
 
 void BasicSocket::StartWrite() {
   CHECK(!write_started_);
+  CHECK(!watcher_.empty());
 
   write_started_ = true;
   WatchWrite(true);
@@ -468,6 +478,8 @@ class TlsSocket : public Socket, public Socket::Watcher {
   TlsSocket(const Socket::Builder& opt, BasicSocket::Family family);
   DISALLOW_COPY(TlsSocket);
   ~TlsSocket();
+
+  void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(watcher); }
 
   void Start() override;
   void StartRead() override;
@@ -548,6 +560,7 @@ void TlsSocket::Start() {
 void TlsSocket::StartRead() {
   CHECK(ssl_);
   CHECK(!read_started_);
+  CHECK(!watcher_.empty());
 
   read_started_ = true;
   if (pending_ == kNone)
@@ -557,6 +570,7 @@ void TlsSocket::StartRead() {
 void TlsSocket::StartWrite() {
   CHECK(ssl_);
   CHECK(!write_started_);
+  CHECK(!watcher_.empty());
 
   write_started_ = true;
   if (pending_ == kNone)
@@ -745,10 +759,62 @@ std::string TlsException::Describe(const std::string& what, int tls_error, int r
   return desc;
 }
 
-} // namespace internal
+class BasicServerSocket : public ServerSocket, public FdReader {
+ public:
+  BasicServerSocket(
+      Loop* loop,
+      Watcher* watcher,
+      int domain, int type, int proto,
+      struct sockaddr* bind_addr, socklen_t bind_addr_len);
 
-Socket::Socket() {}
-Socket::~Socket() {}
+  void CanRead(int fd) override;
+
+ private:
+  Loop* loop_;
+  base::CallbackPtr<Watcher> watcher_;
+
+  int socket_;
+};
+
+BasicServerSocket::BasicServerSocket(
+    Loop* loop,
+    Watcher* watcher,
+    int domain, int type, int proto,
+    struct sockaddr* bind_addr, socklen_t bind_addr_len)
+    : loop_(loop), watcher_(watcher)
+{
+  socket_ = socket(domain, type, proto);
+  if (socket_ == -1)
+    throw Socket::Exception("socket", errno);
+  if (fcntl(socket_, F_SETFL, O_NONBLOCK) == -1) {
+    close(socket_);
+    throw Socket::Exception("fnctl(O_NONBLOCK)", errno);
+  }
+  if (bind(socket_, bind_addr, bind_addr_len) == -1) {
+    close(socket_);
+    throw Socket::Exception("bind", errno);
+  }
+  if (listen(socket_, SOMAXCONN) == -1) {
+    close(socket_);
+    throw Socket::Exception("listen", errno);
+  }
+  loop->ReadFd(socket_, this);
+}
+
+void BasicServerSocket::CanRead(int fd) {
+  CHECK(fd == socket_);
+  int ret = accept(fd, nullptr, nullptr);
+
+  if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
+    return;  // try again in the next loop
+  if (ret == -1)
+    throw Socket::Exception("accept", errno);  // TODO: pass to Watcher instead
+
+  auto new_socket = std::make_unique<BasicSocket>(loop_, ret);
+  watcher_.Call(&Watcher::Accepted, std::move(new_socket));
+}
+
+} // namespace internal
 
 std::unique_ptr<Socket> Socket::Builder::Build() {
   CHECK(loop_);
@@ -757,9 +823,9 @@ std::unique_ptr<Socket> Socket::Builder::Build() {
 
   internal::BasicSocket::Family family;
   if (!host_.empty() && !port_.empty())
-    family = internal::BasicSocket::kInet;
+    family = INET;
   else if (!unix_.empty())
-    family = internal::BasicSocket::kUnix;
+    family = UNIX;
   else
     throw base::Exception("{host, port} or unix not specified in Socket::Builder");
 
@@ -767,6 +833,27 @@ std::unique_ptr<Socket> Socket::Builder::Build() {
     return std::make_unique<internal::TlsSocket>(*this, family);
   else
     return std::make_unique<internal::BasicSocket>(*this, family, watcher_);
+}
+
+std::unique_ptr<ServerSocket> ListenInet(Loop* loop, ServerSocket::Watcher* watcher, int port) {
+  throw Socket::Exception("TODO: ListenInet");
+}
+
+std::unique_ptr<ServerSocket> ListenUnix(Loop* loop, ServerSocket::Watcher* watcher, const std::string& path, Socket::Kind kind) {
+  struct sockaddr_un addr;
+
+  if (path.length() + 1 > sizeof (addr.sun_path))
+    throw Socket::Exception("unix socket name too long: " + path);
+
+  unlink(path.c_str());
+
+  addr.sun_family = AF_UNIX;
+  std::strcpy(addr.sun_path, path.c_str());
+
+  return std::make_unique<internal::BasicServerSocket>(
+      loop, watcher,
+      AF_UNIX, kind, 0,
+      (struct sockaddr*) &addr, sizeof addr);
 }
 
 } // namespace event
