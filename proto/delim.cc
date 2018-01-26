@@ -42,6 +42,16 @@ bool DelimReader::Read(google::protobuf::Message* message, bool merge) {
   return success; // TODO: distinguish EOF from errors
 }
 
+bool DelimReader::Skip() {
+  google::protobuf::io::CodedInputStream coded(stream_);
+
+  google::protobuf::uint64 size;
+  if (!coded.ReadVarint64(&size))
+    return false;
+
+  return coded.Skip(size);
+}
+
 DelimWriter::DelimWriter(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
     : stream_(stream), owned_(owned), file_(nullptr)
 {}

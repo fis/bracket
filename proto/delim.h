@@ -42,6 +42,13 @@ class DelimReader {
    */
   bool Read(google::protobuf::Message* message, bool merge = false);
 
+  /**
+   * Skips over the next message in the stream.
+   *
+   * \return `true` if successful, `false` if the stream ended or a read failed
+   */
+  bool Skip();
+
  private:
   google::protobuf::io::ZeroCopyInputStream* stream_;
   bool owned_;
