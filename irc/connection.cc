@@ -40,7 +40,8 @@ constexpr int kAutojoinDelayMs = 10000;
 
 // TODO sort methods?
 
-Connection::Connection(const Config& config, event::Loop* loop) : loop_(loop)
+Connection::Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry)
+    : loop_(loop)
 {
   // TODO: defaults from a thing
   config_.set_nick("feworitg");
@@ -50,6 +51,39 @@ Connection::Connection(const Config& config, event::Loop* loop) : loop_(loop)
   config_.set_connect_timeout_ms(60000);
   config_.set_reconnect_delay_ms(30000);
   config_.MergeFrom(config);
+
+  if (metric_registry) {
+    metric_connection_up_ = &prometheus::BuildGauge()
+        .Name("irc_connection_up")
+        .Help("Is the bot currently connected to an IRC server?")
+        .Register(*metric_registry)
+        .Add({});
+    metric_sent_bytes_ = &prometheus::BuildCounter()
+        .Name("irc_sent_bytes")
+        .Help("How many bytes have been sent to the IRC server?")
+        .Register(*metric_registry)
+        .Add({});
+    metric_sent_lines_ = &prometheus::BuildCounter()
+        .Name("irc_sent_lines")
+        .Help("How many lines (commands) have been sent to the IRC server?")
+        .Register(*metric_registry)
+        .Add({});
+    metric_received_bytes_ = &prometheus::BuildCounter()
+        .Name("irc_received_bytes")
+        .Help("How many bytes have been received from the IRC server?")
+        .Register(*metric_registry)
+        .Add({});
+    metric_received_lines_ = &prometheus::BuildCounter()
+        .Name("irc_received_lines")
+        .Help("How many lines (commands) have been received from the IRC server?")
+        .Register(*metric_registry)
+        .Add({});
+    metric_write_queue_bytes_ = &prometheus::BuildGauge()
+        .Name("irc_write_queue_bytes")
+        .Help("How many bytes are pending in the write queue?")
+        .Register(*metric_registry)
+        .Add({});
+  }
 }
 
 Connection::~Connection() {
@@ -112,6 +146,9 @@ void Connection::ConnectionOpen() {
   // TODO: trigger autojoin prematurely on suitable numeric from server
 
   socket_->StartRead();
+
+  if (metric_connection_up_)
+    metric_connection_up_->Set(1);
 }
 
 void Connection::ConnectionFailed(const std::string& error) {
@@ -133,6 +170,8 @@ void Connection::CanRead() {
   socket_->StartRead();
 
   read_buffer_used_ += got;
+  if (metric_received_bytes_)
+    metric_received_bytes_->Increment(got);
 
   // parse complete messages and pass them to listeners
 
@@ -153,6 +192,8 @@ void Connection::CanRead() {
           HandleMessage(read_message_);
         else
           LOG(ERROR) << "invalid IRC message";  /// \todo dump bytes?
+        if (metric_received_lines_)
+          metric_received_lines_->Increment();
       }
     } else {
       // hit end of buffer with an incomplete message
@@ -231,8 +272,10 @@ void Connection::Send(const Message& message) {
     cost += extra_cost_it->second;
 
   write_queue_.emplace_back(write_size + 2, cost);
-
   LOG(VERBOSE) << "added " << write_size + 2 << " bytes to the write queue (cost " << cost << ')';
+
+  if (metric_write_queue_bytes_)
+    metric_write_queue_bytes_->Set(write_buffer_.size());
 
   // TODO: don't try until a connection has been established
   if (was_empty)  // otherwise we're trying already
@@ -297,9 +340,14 @@ void Connection::CanWrite() {
       return;  // wait for next round, write still started
   }
 
+  if (metric_sent_bytes_)
+    metric_sent_bytes_->Increment(wrote);
+
   // pop off what we managed to write
 
   write_buffer_.Pop(wrote);
+  if (metric_write_queue_bytes_)
+    metric_write_queue_bytes_->Set(write_buffer_.size());
 
   std::size_t pop = wrote;
   while (pop > 0) {
@@ -310,6 +358,8 @@ void Connection::CanWrite() {
       pop -= first_bytes;
       write_credit_ -= 10 * msg.first + msg.second;
       write_queue_.pop_front();
+      if (metric_sent_lines_)
+        metric_sent_lines_->Increment();
     } else {
       msg.first -= pop;
       write_credit_ -= 10 * pop;
@@ -366,6 +416,9 @@ void Connection::ConnectionLost(const std::string& error) {
   current_server_ = (current_server_ + 1) % config_.servers_size();
 
   reconnect_timer_ = loop_->Delay(std::chrono::milliseconds(reconnect_delay_ms), &reconnect_timer_callback_);
+
+  if (metric_connection_up_)
+    metric_connection_up_->Set(0);
 }
 
 void Connection::ReconnectTimer() {

@@ -9,6 +9,8 @@
 #include <memory>
 #include <queue>
 
+#include <prometheus/registry.h>
+
 #include "base/buffer.h"
 #include "base/callback.h"
 #include "base/common.h"
@@ -77,9 +79,10 @@ class Connection : public event::Socket::Watcher {
    * optional. There must be at least one entry in the `server` list, however.
    *
    * The connection does not take ownership of the provided Looper, but the looper is expected to
-   * outlive the connection.
+   * outlive the connection. If the optional \p metric_registry parameter is set, it must do
+   * likewise.
    */
-  Connection(const Config& config, event::Loop* loop);
+  Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry = nullptr);
 
   DISALLOW_COPY(Connection);
 
@@ -109,10 +112,6 @@ class Connection : public event::Socket::Watcher {
   void AddReader(Reader* reader, bool owned = false) {
     readers_.Add(reader, owned);
   }
-  /** \overload */
-  void AddReader(const std::function<void(const Message&)>& callback) {
-    readers_.Add(new ReaderF(callback), true);
-  }
 
   /** Removes a listener of incoming messages. */
   bool RemoveReader(Reader* reader) {
@@ -120,7 +119,6 @@ class Connection : public event::Socket::Watcher {
   }
 
  private:
-  CALLBACK_F1(ReaderF, Reader, MessageReceived, const Message&);
   /** Maximum number of write credits. */
   static constexpr int kMaxWriteCredit = 10000;
 
@@ -131,6 +129,14 @@ class Connection : public event::Socket::Watcher {
 
   /** Looper used for scheduling and I/O. */
   event::Loop* loop_;
+
+  // Prometheus metrics.
+  prometheus::Gauge* metric_connection_up_ = nullptr;
+  prometheus::Counter* metric_sent_bytes_ = nullptr;
+  prometheus::Counter* metric_sent_lines_ = nullptr;
+  prometheus::Counter* metric_received_bytes_ = nullptr;
+  prometheus::Counter* metric_received_lines_ = nullptr;
+  prometheus::Gauge* metric_write_queue_bytes_ = nullptr;
 
   /** Reconnect timer, active if `kIdle` after an error, but running. */
   event::TimerId reconnect_timer_ = event::kNoTimer;

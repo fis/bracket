@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package irc.bot;
+
+import "irc/config.proto";
+
+// IRC bot configuration.
+message Config {
+  // IRC connection configuration.
+  // If you're using a custom configuration proto, this may also be a field in it.
+  irc.Config irc = 1;
+  // Metrics address, e.g. "127.0.0.1:9980".
+  // If this string is empty, Prometheus library isn't initialized.
+  string metrics_addr = 2;
+}

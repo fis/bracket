@@ -13,8 +13,21 @@ cc_library(
         "plugin.h",
     ],
     deps = [
+        ":config_cc_proto",
         "//base",
         "//irc",
         "//proto:util",
+        "@prometheus_cpp//:prometheus_cpp",
     ],
+)
+
+proto_library(
+    name = "config_proto",
+    srcs = ["config.proto"],
+    deps = ["//irc:config_proto"],
+)
+
+cc_proto_library(
+    name = "config_cc_proto",
+    deps = [":config_proto"],
 )

@@ -11,6 +11,8 @@
 #include <unordered_map>
 
 #include <google/protobuf/message.h>
+#include <prometheus/exposer.h>
+#include <prometheus/registry.h>
 
 #include "event/loop.h"
 #include "irc/connection.h"
@@ -37,6 +39,7 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
 
   void Send(const Message& msg) override;
   event::Loop* loop() override { return loop_; }
+  prometheus::Registry* metric_registry() override { return metric_registry_.get(); }
 
  private:
   using PluginFactory = std::function<std::unique_ptr<Plugin>(const google::protobuf::Message& config, PluginHost* host)>;
@@ -44,6 +47,9 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
 
   event::Loop* loop_;
   std::unique_ptr<event::Loop> private_loop_;
+
+  std::unique_ptr<prometheus::Exposer> metric_exposer_;
+  std::shared_ptr<prometheus::Registry> metric_registry_;
 
   std::vector<std::unique_ptr<Plugin>> plugins_;
   std::unique_ptr<irc::Connection> irc_;
