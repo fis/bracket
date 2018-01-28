@@ -12,6 +12,7 @@ cc_library(
     ],
     copts = [
         "-DUSE_IPV6",
+        "-DUSE_WEBSOCKET",
         "-DNDEBUG",
         "-DNO_CGI",
         "-DNO_CACHING",
@@ -23,6 +24,7 @@ cc_library(
     ],
     textual_hdrs = [
         "src/md5.inl",
+        "src/sha1.inl",
         "src/handle_form.inl",
     ],
     visibility = ["//visibility:public"],
