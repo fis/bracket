@@ -169,7 +169,7 @@ TEST(MessageTest, ParsePrefixNick_EmptyUserHost) {
 
 TEST(MessageTest, ParseStopAtCount) {
   Message m;
-  const char* data = ":foo bar baz :quux";
+  const unsigned char* data = reinterpret_cast<const unsigned char*>(":foo bar baz :quux");
 
   ASSERT_FALSE(m.Parse(data, 0));  // stop at start
 
@@ -205,7 +205,7 @@ TEST(MessageTest, ParseStopAtCount) {
 
 TEST(MessageTest, WriteCommand) {
   Message m = { "quit" };
-  char buf[4];
+  unsigned char buf[4];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 4u);
@@ -214,7 +214,7 @@ TEST(MessageTest, WriteCommand) {
 
 TEST(MessageTest, WriteCommandAndArgs) {
   Message m = { "whois", "foo", "bar" };
-  char buf[13];
+  unsigned char buf[13];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 13u);
@@ -223,7 +223,7 @@ TEST(MessageTest, WriteCommandAndArgs) {
 
 TEST(MessageTest, WriteCommandAndTrailing) {
   Message m = { "quit", "some message here" };
-  char buf[23];
+  unsigned char buf[23];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 23u);
@@ -232,7 +232,7 @@ TEST(MessageTest, WriteCommandAndTrailing) {
 
 TEST(MessageTest, WriteCommandAndArgsAndTrailing) {
   Message m = { "whois", "foo", "bar", "extra stuff" };
-  char buf[26];
+  unsigned char buf[26];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 26u);
@@ -241,7 +241,7 @@ TEST(MessageTest, WriteCommandAndArgsAndTrailing) {
 
 TEST(MessageTest, WritePrefixedCommand) {
   Message m({ "quit" }, "irc.server");
-  char buf[16];
+  unsigned char buf[16];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 16u);
@@ -250,7 +250,7 @@ TEST(MessageTest, WritePrefixedCommand) {
 
 TEST(MessageTest, WritePrefixedCommandAndArgs) {
   Message m({ "whois", "foo", "bar" }, "irc.server");
-  char buf[25];
+  unsigned char buf[25];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 25u);
@@ -259,7 +259,7 @@ TEST(MessageTest, WritePrefixedCommandAndArgs) {
 
 TEST(MessageTest, WritePrefixedCommandAndTrailing) {
   Message m({ "quit", "some message here" }, "irc.server");
-  char buf[35];
+  unsigned char buf[35];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 35u);
@@ -268,7 +268,7 @@ TEST(MessageTest, WritePrefixedCommandAndTrailing) {
 
 TEST(MessageTest, WritePrefixedCommandAndArgsAndTrailing) {
   Message m({ "whois", "foo", "bar", "extra stuff" }, "irc.server");
-  char buf[38];
+  unsigned char buf[38];
   std::size_t size = m.Write(buf, sizeof buf);
 
   ASSERT_EQ(size, 38u);
@@ -279,7 +279,7 @@ TEST(MessageTest, WritePrefixedCommandAndArgsAndTrailing) {
 
 TEST(MessageTest, WriteStopAtCount) {
   Message m({ "bar", "baz", "quux zuul" }, "foo");
-  char buf[24] = {0};
+  unsigned char buf[24] = {0};
   char truth[24] = ":foo bar baz :quux zuul";
 
   EXPECT_EQ(m.Write(nullptr, 0), 23u);

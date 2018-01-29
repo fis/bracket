@@ -155,7 +155,7 @@ class Connection : public event::Socket::Watcher {
    * (512) bytes. Otherwise an incomplete message may fill the buffer,
    * preventing further reads from taking place.
    */
-  std::array<char, 65536> read_buffer_;
+  std::array<unsigned char, 65536> read_buffer_;
   /** Amount of bytes used for an incomplete message in front of #read_buffer_. */
   std::size_t read_buffer_used_ = 0;
   /** Listener set for incoming messages. */
@@ -164,7 +164,7 @@ class Connection : public event::Socket::Watcher {
   Message read_message_;
 
   /** Outgoing byte buffer. */
-  base::RingBuffer write_buffer_;
+  base::ring_buffer write_buffer_;
   /**
    * Outgoing message queue, describing #write_buffer_ contents.
    *

@@ -7,6 +7,17 @@
 #include "irc/connection.h"
 #include "irc/message.h"
 
+class Reader : public irc::Connection::Reader {
+  void MessageReceived(const irc::Message& msg) override {
+    std::cerr << "Got this:\n";
+    if (!msg.prefix().empty())
+      std::cerr << "  prefix: " << msg.prefix() << '\n';
+    std::cerr << "  command: " << msg.command() << '\n';
+    for (const std::string& arg : msg.args())
+      std::cerr << "  arg: " << arg << '\n';
+  }
+};
+
 int main(int argc, char *argv[]) {
 #if 0
   gflags::SetUsageMessage("IRC client library test");
@@ -27,14 +38,8 @@ int main(int argc, char *argv[]) {
   event::Loop loop;
   irc::Connection connection(config, &loop);
 
-  connection.AddReader([](const irc::Message& msg) {
-      std::cerr << "Got this:\n";
-      if (!msg.prefix().empty())
-        std::cerr << "  prefix: " << msg.prefix() << '\n';
-      std::cerr << "  command: " << msg.command() << '\n';
-      for (const std::string& arg : msg.args())
-        std::cerr << "  arg: " << arg << '\n';
-    });
+  Reader reader;
+  connection.AddReader(&reader);
 
   connection.Start();
   while (true)

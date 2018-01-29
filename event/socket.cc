@@ -62,7 +62,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   void StartRead() override;
   void StartWrite() override;
   std::size_t Read(void* buf, std::size_t count) override;
-  std::size_t Write(void* buf, std::size_t count) override;
+  std::size_t Write(const void* buf, std::size_t count) override;
 
   void WatchRead(bool watch);
   void WatchWrite(bool watch);
@@ -452,7 +452,7 @@ std::size_t BasicSocket::Read(void* buf, std::size_t count) {
   return ret;
 }
 
-std::size_t BasicSocket::Write(void* buf, std::size_t count) {
+std::size_t BasicSocket::Write(const void* buf, std::size_t count) {
   CHECK(state_ == kOpen);
 
   ssize_t ret = write(socket_, buf, count);
@@ -485,7 +485,7 @@ class TlsSocket : public Socket, public Socket::Watcher {
   void StartRead() override;
   void StartWrite() override;
   std::size_t Read(void* buf, std::size_t count) override;
-  std::size_t Write(void* buf, std::size_t count) override;
+  std::size_t Write(const void* buf, std::size_t count) override;
 
  private:
   enum PendingOp {
@@ -618,7 +618,7 @@ std::size_t TlsSocket::Read(void* buf, std::size_t count) {
   return ret;
 }
 
-std::size_t TlsSocket::Write(void* buf, std::size_t count) {
+std::size_t TlsSocket::Write(const void* buf, std::size_t count) {
   CHECK(ssl_);
   CHECK(pending_ != kWantReadForRead && pending_ != kWantWriteForRead);
 

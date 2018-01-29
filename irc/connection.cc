@@ -175,7 +175,7 @@ void Connection::CanRead() {
 
   // parse complete messages and pass them to listeners
 
-  char *start = read_buffer_.data();
+  auto* start = read_buffer_.data();
   std::size_t left = read_buffer_used_;
 
   while (left > 0) {
@@ -248,23 +248,23 @@ void Connection::Send(const Message& message) {
 
   constexpr std::size_t kMaxContentSize = kMaxMessageSize - 2;
 
-  auto buffer = write_buffer_.Push(kMaxContentSize);
-  std::size_t message_size = message.Write(buffer.first.data, buffer.first.size);  // first half
+  auto buffer = write_buffer_.push(kMaxContentSize);
+  std::size_t message_size = message.Write(buffer.first.data(), buffer.first.size());  // first half
   std::size_t write_size = std::min(message_size, kMaxContentSize);
 
-  if (write_size > buffer.first.size) {
+  if (write_size > buffer.first.size()) {
     // didn't fit, so do trailing half
-    CHECK(buffer.second.valid() && write_size <= buffer.first.size + buffer.second.size);
-    char tmp_buffer[write_size];
+    CHECK(buffer.second.valid() && write_size <= buffer.first.size() + buffer.second.size());
+    unsigned char tmp_buffer[write_size];
     message.Write(tmp_buffer, write_size);
-    std::memcpy(buffer.second.data, tmp_buffer + buffer.first.size, write_size - buffer.first.size);
+    std::memcpy(buffer.second.data(), tmp_buffer + buffer.first.size(), write_size - buffer.first.size());
   }
 
   if (write_size < kMaxContentSize)
-    write_buffer_.Unpush(kMaxContentSize - write_size);
+    write_buffer_.unpush(kMaxContentSize - write_size);
 
-  write_buffer_.PushChar(13);
-  write_buffer_.PushChar(10);
+  write_buffer_.push_byte(13);
+  write_buffer_.push_byte(10);
 
   int cost = 1000;
   auto extra_cost_it = extra_cost.find(message.command());
@@ -318,21 +318,21 @@ void Connection::CanWrite() {
   if (can_write > 0) {
     LOG(VERBOSE) << "try to write " << can_write << " bytes to server";
 
-    auto data = write_buffer_.Front(can_write);
-    for (const base::BufferView& slice : { data.first, data.second }) {
-      if (slice.size == 0)
+    auto data = write_buffer_.front(can_write);
+    for (const base::byte_view& slice : { data.first, data.second }) {
+      if (slice.size() == 0)
         break;
 
       std::size_t ret;
       try {
-        ret = socket_->Write(slice.data, slice.size);
+        ret = socket_->Write(slice.data(), slice.size());
       } catch (const event::Socket::Exception& e) {
         ConnectionLost(e.what());
         return;
       }
 
       wrote += ret;
-      if ((base::BufferSize)ret != slice.size)
+      if ((std::size_t) ret != slice.size())
         break;  // couldn't fit all of it in
     }
 
@@ -345,7 +345,7 @@ void Connection::CanWrite() {
 
   // pop off what we managed to write
 
-  write_buffer_.Pop(wrote);
+  write_buffer_.pop(wrote);
   if (metric_write_queue_bytes_)
     metric_write_queue_bytes_->Set(write_buffer_.size());
 
@@ -394,7 +394,7 @@ void Connection::ConnectionLost(const std::string& error) {
 
   socket_.reset();
 
-  write_buffer_.Clear();
+  write_buffer_.clear();
   write_queue_.clear();
 
   if (write_credit_timer_) {

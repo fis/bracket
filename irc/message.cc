@@ -26,8 +26,8 @@ Message::Message(std::initializer_list<const char*> contents, const char* prefix
   }
 }
 
-bool Message::Parse(const char* data, std::size_t count) {
-  const char* p = data;
+bool Message::Parse(const unsigned char* data, std::size_t count) {
+  auto* p = reinterpret_cast<const char*>(data);
   std::size_t left = count;
 
   // parse prefix
@@ -37,7 +37,7 @@ bool Message::Parse(const char* data, std::size_t count) {
     ++p;
     --left;
 
-    const char* d = static_cast<const char*>(std::memchr(p, ' ', left));
+    auto* d = static_cast<const char*>(std::memchr(p, ' ', left));
     if (!d)
       return false;
 
@@ -95,7 +95,7 @@ bool Message::Parse(const char* data, std::size_t count) {
   return true;
 }
 
-std::size_t Message::Write(char* buffer, std::size_t size) const {
+std::size_t Message::Write(unsigned char* buffer, std::size_t size) const {
   std::size_t at = 0;
 
   if (!prefix_.empty()) {

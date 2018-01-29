@@ -34,15 +34,15 @@ class Message {
    * specification. For example, this function accepts any non-space
    * characters inside the command.
    */
-  bool Parse(const char* data, std::size_t count);
+  bool Parse(const unsigned char* data, std::size_t count);
 
   /**
    * Updates the message contents by parsing a 0-terminated string.
    *
-   * This is a convenience method for Parse(const char*, std::size_t).
+   * This is a convenience method for Parse(const unsigned char*, std::size_t).
    */
   bool Parse(const char* data) {
-    return Parse(data, std::strlen(data));
+    return Parse(reinterpret_cast<const unsigned char*>(data), std::strlen(data));
   }
 
   /**
@@ -60,7 +60,7 @@ class Message {
    * particular, this means only the last argument may contain a
    * space.
    */
-  std::size_t Write(char* buffer, std::size_t size) const;
+  std::size_t Write(unsigned char* buffer, std::size_t size) const;
 
   /**
    * Returns the size needed to write the message. Equivalent to

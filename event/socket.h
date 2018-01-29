@@ -98,7 +98,7 @@ struct Socket {
    * time you call this method, you must pass in the same contents, to avoid unpredictable
    * behavior. Some of the bytes may already have been copied to the library data structures.
    */
-  virtual std::size_t Write(void* buf, std::size_t count) = 0;
+  virtual std::size_t Write(const void* buf, std::size_t count) = 0;
 
   /** Exception class for indicating socket I/O errors. */
   class Exception : public base::Exception {

@@ -63,7 +63,7 @@ class FakeSignalFd : public Loop::SignalFd {
   void Add(int signal) override {}
   void Remove(int signal) override {}
   int Read() override { return -1; }
-  int fd() const override { return kFakeSignalFd; }
+  int fd() const noexcept override { return kFakeSignalFd; }
 };
 
 struct MockReader : public FdReader {
