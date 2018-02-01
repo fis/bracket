@@ -99,17 +99,17 @@ Loop::Loop(PollFunc* poll, std::unique_ptr<base::TimerFd> timer, std::unique_ptr
       timer_(std::move(timer)),
       signal_fd_(std::move(signal_fd))
 {
-  ReadFd(timer_.fd(), &read_timer_callback_);
+  ReadFd(timer_.fd(), base::borrow(&read_timer_callback_));
 
-  AddSignal(SIGTERM, &handle_sigterm_callback_);
-  ReadFd(signal_fd_->fd(), &read_signal_callback_);
+  AddSignal(SIGTERM, base::borrow(&handle_sigterm_callback_));
+  ReadFd(signal_fd_->fd(), base::borrow(&read_signal_callback_));
 }
 
-void Loop::ReadFd(int fd, FdReader* callback, bool owned) {
+void Loop::ReadFd(int fd, base::optional_ptr<FdReader> callback) {
   auto&& fd_info = GetFd(fd);
   if (callback) {
     CHECK(fd_info->reader.empty());
-    fd_info->reader.Set(callback, owned);
+    fd_info->reader.Set(std::move(callback));
     if (!pollfds_.empty()) {
       struct pollfd *pfd = &pollfds_[fd_info->pollfd_index];
       pfd->events |= POLLIN;
@@ -126,11 +126,11 @@ void Loop::ReadFd(int fd, FdReader* callback, bool owned) {
   }
 }
 
-void Loop::WriteFd(int fd, FdWriter* callback, bool owned) {
+void Loop::WriteFd(int fd, base::optional_ptr<FdWriter> callback) {
   auto&& fd_info = GetFd(fd);
   if (callback) {
     CHECK(fd_info->writer.empty());
-    fd_info->writer.Set(callback, owned);
+    fd_info->writer.Set(std::move(callback));
     if (!pollfds_.empty()) {
       struct pollfd *pfd = &pollfds_[fd_info->pollfd_index];
       pfd->events |= POLLOUT;
@@ -147,11 +147,11 @@ void Loop::WriteFd(int fd, FdWriter* callback, bool owned) {
   }
 }
 
-SignalId Loop::AddSignal(int signal, Signal* callback, bool owned) {
+SignalId Loop::AddSignal(int signal, base::optional_ptr<Signal> callback) {
   auto other_handler = signal_map_.find(signal);
   bool register_signal = other_handler == signal_map_.end();
 
-  internal::SignalRecord* record = signals_.emplace(callback, owned);
+  internal::SignalRecord* record = signals_.emplace(std::move(callback));
   record->map_item = signal_map_.insert(other_handler, std::make_pair(signal, record));
 
   if (register_signal)
@@ -169,14 +169,14 @@ void Loop::RemoveSignal(SignalId signal_id) {
     signal_fd_->Remove(signal);
 }
 
-ClientId Loop::AddClient(Client* callback, bool owned) {
+ClientId Loop::AddClient(base::optional_ptr<Client> callback) {
   ClientId id = next_client_id_++;
 
-  clients_.Add(id, callback, owned);
+  clients_.Add(id, std::move(callback));
   if (client_pipe_[0] == -1) {
     if (pipe(client_pipe_) == -1)
       throw base::Exception("pipe(client)", errno);
-    ReadFd(client_pipe_[0], &read_client_event_callback_);
+    ReadFd(client_pipe_[0], base::borrow(&read_client_event_callback_));
   }
 
   return id;
@@ -269,9 +269,9 @@ void Loop::Poll() {
   }
 }
 
-TimerId Loop::Delay_(base::TimerDuration delay, Timed* callback, bool owned) {
+TimerId Loop::Delay_(base::TimerDuration delay, base::optional_ptr<Timed> callback) {
   auto [timer, cb] = timer_.AddDelay(delay);
-  cb->Set(callback, owned);
+  cb->Set(std::move(callback));
   return timer;
 }
 

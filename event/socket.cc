@@ -56,7 +56,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   DISALLOW_COPY(BasicSocket);
   ~BasicSocket();
 
-  void SetWatcher(Watcher* watcher) override { watcher_.Set(watcher); }
+  void SetWatcher(Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
   void Start() override;
   void StartRead() override;
@@ -175,7 +175,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
 };
 
 BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
-    : loop_(opt.loop_), watcher_(watcher),
+    : loop_(opt.loop_), watcher_(base::borrow(watcher)),
       resolve_timeout_ms_(opt.resolve_timeout_ms_), connect_timeout_ms_(opt.connect_timeout_ms_)
 {
   if (family == INET) {
@@ -226,7 +226,7 @@ void BasicSocket::Start() {
   if (resolve_data_) {
     LOG(DEBUG) << "resolving host: " << resolve_data_->host << ':' << resolve_data_->port;
     state_ = kResolving;
-    resolve_timer_ = loop_->Delay(std::chrono::milliseconds(resolve_timeout_ms_), &resolve_timeout_callback_);
+    resolve_timer_ = loop_->Delay(std::chrono::milliseconds(resolve_timeout_ms_), base::borrow(&resolve_timeout_callback_));
     std::thread(&Resolve, resolve_data_).detach();
   } else if (connect_addr_unix_) {
     state_ = kConnecting;
@@ -311,8 +311,8 @@ void BasicSocket::Connect() {
   int ret = connect(socket_, connect_addr_->ai_addr, connect_addr_->ai_addrlen);
   if (ret == -1 && errno == EINPROGRESS) {
     // async connect started
-    loop_->WriteFd(socket_, this);
-    connect_timer_ = loop_->Delay(std::chrono::milliseconds(connect_timeout_ms_), &connect_timeout_callback_);
+    loop_->WriteFd(socket_, base::borrow(this));
+    connect_timer_ = loop_->Delay(std::chrono::milliseconds(connect_timeout_ms_), base::borrow(&connect_timeout_callback_));
   } else if (ret == 0) {
     // somehow connected immediately
     ConnectDone();
@@ -418,7 +418,7 @@ void BasicSocket::WatchRead(bool watch) {
   CHECK(state_ == kOpen);
 
   if (watch)
-    loop_->ReadFd(socket_, this);
+    loop_->ReadFd(socket_, base::borrow(this));
   else
     loop_->ReadFd(socket_);
 }
@@ -427,7 +427,7 @@ void BasicSocket::WatchWrite(bool watch) {
   CHECK(state_ == kOpen);
 
   if (watch)
-    loop_->WriteFd(socket_, this);
+    loop_->WriteFd(socket_, base::borrow(this));
   else
     loop_->WriteFd(socket_);
 }
@@ -479,7 +479,7 @@ class TlsSocket : public Socket, public Socket::Watcher {
   DISALLOW_COPY(TlsSocket);
   ~TlsSocket();
 
-  void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(watcher); }
+  void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
   void Start() override;
   void StartRead() override;
@@ -534,7 +534,7 @@ class TlsException : public Socket::Exception {
 };
 
 TlsSocket::TlsSocket(const Socket::Builder& opt, BasicSocket::Family family)
-    : socket_(opt, family, this), watcher_(opt.watcher_)
+    : socket_(opt, family, this), watcher_(base::borrow(opt.watcher_))
 {
   ssl_ctx_ = bssl::UniquePtr<SSL_CTX>(SSL_CTX_new(TLS_method()));
   SSL_CTX_set_mode(ssl_ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
@@ -781,7 +781,7 @@ BasicServerSocket::BasicServerSocket(
     Watcher* watcher,
     int domain, int type, int proto,
     struct sockaddr* bind_addr, socklen_t bind_addr_len)
-    : loop_(loop), watcher_(watcher)
+    : loop_(loop), watcher_(base::borrow(watcher))
 {
   socket_ = socket(domain, type, proto);
   if (socket_ == -1)
@@ -798,7 +798,7 @@ BasicServerSocket::BasicServerSocket(
     close(socket_);
     throw Socket::Exception("listen", errno);
   }
-  loop->ReadFd(socket_, this);
+  loop->ReadFd(socket_, base::borrow(this));
 }
 
 void BasicServerSocket::CanRead(int fd) {

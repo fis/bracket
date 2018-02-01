@@ -80,9 +80,9 @@ class Callback {
 template<typename Iface>
 class CallbackPtr : public internal::CallbackContainer {
  public:
-  explicit CallbackPtr(Iface* callback = nullptr, bool owned = false) {
+  explicit CallbackPtr(base::optional_ptr<Iface> callback = nullptr) {
     if (callback)
-      Set(callback, owned);
+      Set(std::move(callback));
   }
   DISALLOW_COPY(CallbackPtr);
 
@@ -96,12 +96,11 @@ class CallbackPtr : public internal::CallbackContainer {
    * If the container already owned a callback, it's destroyed. If it held but did not own a
    * callback, that callback will stop being linked to this container, but will not be destroyed.
    */
-  void Set(Iface* callback, bool owned = false) {
+  void Set(base::optional_ptr<Iface> callback) {
     if (callback_)
       Clear();
-    callback_ = callback;
-    owned_ = owned;
-    callback->RegisterContainer(this, nullptr);
+    callback_ = std::move(callback);
+    callback_->RegisterContainer(this, nullptr);
   }
 
   /**
@@ -112,10 +111,7 @@ class CallbackPtr : public internal::CallbackContainer {
    */
   void Clear() {
     if (callback_) {
-      if (owned_)
-        delete callback_;
-      else
-        callback_->UnregisterContainer(this);
+      callback_->UnregisterContainer(this);
       callback_ = nullptr;
     }
   }
@@ -131,7 +127,7 @@ class CallbackPtr : public internal::CallbackContainer {
   template<typename F>
   void With(F f) {
     if (callback_)
-      f(callback_);
+      f(callback_.get());
   }
 
   /**
@@ -150,7 +146,7 @@ class CallbackPtr : public internal::CallbackContainer {
   template<typename M, typename... Args>
   void Call(M m, Args&&... args) {
     if (callback_)
-      (callback_->*m)(std::forward<Args>(args)...);
+      ((*callback_).*m)(std::forward<Args>(args)...);
   }
 
   /**
@@ -159,7 +155,7 @@ class CallbackPtr : public internal::CallbackContainer {
    * Only intended to be called by code in the Callback base class.
    */
   void Unregister(Callback* dying_callback, void* data) override {
-    if (callback_ == dying_callback)
+    if (callback_.get() == dying_callback)
       callback_ = nullptr;
   }
 
@@ -167,8 +163,7 @@ class CallbackPtr : public internal::CallbackContainer {
   bool empty() const noexcept { return !callback_; }
 
  private:
-  Iface* callback_ = nullptr;
-  bool owned_ = false;
+  base::optional_ptr<Iface> callback_ = nullptr;
 };
 
 /**
@@ -187,8 +182,7 @@ class CallbackSet : public internal::CallbackContainer {
 
   ~CallbackSet() {
     for (auto&& holder : callbacks_)
-      if (!holder.second.owned)
-        holder.second.callback->UnregisterContainer(this);
+      holder.second.callback->UnregisterContainer(this);
   }
 
   /**
@@ -196,14 +190,13 @@ class CallbackSet : public internal::CallbackContainer {
    *
    * \tparam CDatas extra data types, must be convertible to \p Datas
    * \param callback callback to add to the set
-   * \param owned if `true`, the callback is destroyed when removed
    * \param datas initializers for any extra data
    */
   template<typename... CDatas>
-  void Add(Iface* callback, bool owned, CDatas&&... datas) {
-    auto [holder, inserted] = callbacks_.try_emplace(callback, callback, owned, std::forward<CDatas>(datas)...);
+  void Add(base::optional_ptr<Iface> callback, CDatas&&... datas) {
+    auto [holder, inserted] = callbacks_.try_emplace(callback.get(), std::move(callback), std::forward<CDatas>(datas)...);
     CHECK(inserted);
-    callback->RegisterContainer(this, holder->second.callback);
+    callback->RegisterContainer(this, holder->second.callback.get());
   }
 
   /** Removes a callback from the set. */
@@ -211,8 +204,8 @@ class CallbackSet : public internal::CallbackContainer {
     auto holder = callbacks_.extract(callback);
     if (!holder)
       return false;
-    if (!holder.mapped().owned) // TODO: maybe move this logic to CallbackHolder as well
-      holder.mapped().callback->UnregisterContainer(this);
+    // TODO: maybe move this logic to CallbackHolder as well
+    holder.mapped().callback->UnregisterContainer(this);
     return true;
   }
 
@@ -225,7 +218,7 @@ class CallbackSet : public internal::CallbackContainer {
   template<typename F>
   void For(F f) {
     for (auto&& holder : callbacks_)
-      f(holder.second.callback);
+      f(holder.second.callback.get());
   }
 
   /**
@@ -243,7 +236,7 @@ class CallbackSet : public internal::CallbackContainer {
   unsigned Call(M m, Args&&... args) {
     unsigned count = 0;
     for (auto&& holder : callbacks_) {
-      (holder.second.callback->*m)(std::forward<Args>(args)...);
+      ((*holder.second.callback).*m)(std::forward<Args>(args)...);
       ++count;
     }
     return count;
@@ -264,7 +257,7 @@ class CallbackSet : public internal::CallbackContainer {
     unsigned count = 0;
     for (auto&& holder : callbacks_) {
       if (std::apply(pred, holder.second.data)) {
-        (holder.second.callback->*m)(std::forward<Args>(args)...);
+        ((*holder.second.callback).*m)(std::forward<Args>(args)...);
         ++count;
       }
     }
@@ -285,18 +278,13 @@ class CallbackSet : public internal::CallbackContainer {
 
  private:
   struct CallbackHolder {
-    Iface* callback;
-    bool owned;
+    base::optional_ptr<Iface> callback;
     std::tuple<Datas...> data;
     template<typename... CDatas>
-    CallbackHolder(Iface* callback, bool owned, CDatas&&... args)
-        : callback(callback), owned(owned), data(std::forward<CDatas>(args)...)
+    CallbackHolder(base::optional_ptr<Iface> callback, CDatas&&... args)
+        : callback(std::move(callback)), data(std::forward<CDatas>(args)...)
     {}
     DISALLOW_COPY(CallbackHolder);
-    ~CallbackHolder() {
-      if (owned)
-        delete callback;
-    }
   };
 
   std::unordered_map<Iface*, CallbackHolder> callbacks_;
@@ -319,35 +307,25 @@ class CallbackMap : public internal::CallbackContainer {
 
   ~CallbackMap() {
     for (auto&& cb : callbacks_) {
-      if (cb.second.second)
-        delete cb.second.first;
-      else
-        cb.second.first->UnregisterContainer(this);
+      cb.second->UnregisterContainer(this);
     }
   }
 
   /** Adds a callback to the map. */
-  void Add(const Key& key, Iface* callback, bool owned = false) {
-    auto [iter, inserted] = callbacks_.try_emplace(key, callback, owned);
+  void Add(const Key& key, base::optional_ptr<Iface> callback) {
+    auto [iter, inserted] = callbacks_.try_emplace(key, std::move(callback));
     if (!inserted) {
       // TODO: modify existing entry
     }
-    iter->second.first = callback;
-    iter->second.second = owned;
     callback->RegisterContainer(this, (void*)&iter->first); // TODO figure out cast
   }
   // TODO Key&& overload
 
   bool Remove(const Key& key) {
     auto node = callbacks_.extract(key);
-
     if (!node)
       return false;
-
-    if (node.mapped().second)
-      delete node.mapped().first;
-    else
-      node.mapped().first->UnregisterContainer(this);
+    node.mapped()->UnregisterContainer(this);
     return true;
   }
 
@@ -369,7 +347,7 @@ class CallbackMap : public internal::CallbackContainer {
     auto iter = callbacks_.find(key);
     if (iter == callbacks_.end())
       return false;
-    (iter->second.first->*m)(std::forward<Args>(args)...);
+    ((*iter->second).*m)(std::forward<Args>(args)...);
     return true;
   }
 
@@ -387,7 +365,7 @@ class CallbackMap : public internal::CallbackContainer {
   bool empty() const noexcept { return callbacks_.empty(); }
 
  private:
-  std::unordered_map<Key, std::pair<Iface*, bool>> callbacks_;
+  std::unordered_map<Key, base::optional_ptr<Iface>> callbacks_;
 };
 
 

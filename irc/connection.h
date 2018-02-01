@@ -109,8 +109,8 @@ class Connection : public event::Socket::Watcher {
   void Send(const Message& message);
 
   /** Adds a listener of incoming messages. */
-  void AddReader(Reader* reader, bool owned = false) {
-    readers_.Add(reader, owned);
+  void AddReader(base::optional_ptr<Reader> reader) {
+    readers_.Add(std::move(reader));
   }
 
   /** Removes a listener of incoming messages. */

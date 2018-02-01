@@ -89,10 +89,10 @@ struct LoopTest : public ::testing::Test {
 
 struct BasicPollTest : public LoopTest {
   BasicPollTest() {
-    loop.ReadFd(1, &reader);
-    loop.WriteFd(2, &writer);
-    loop.ReadFd(3, &reader);
-    loop.WriteFd(3, &writer);
+    loop.ReadFd(1, base::borrow(&reader));
+    loop.WriteFd(2, base::borrow(&writer));
+    loop.ReadFd(3, base::borrow(&reader));
+    loop.WriteFd(3, base::borrow(&writer));
   }
   MockReader reader;
   MockWriter writer;

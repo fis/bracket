@@ -142,7 +142,7 @@ using SignalMap = std::unordered_multimap<int, SignalRecord*>;
 struct SignalRecord {
   base::CallbackPtr<event::Signal> callback;
   SignalMap::const_iterator map_item;
-  SignalRecord(event::Signal* cb, bool o) : callback(cb, o) {}
+  SignalRecord(base::optional_ptr<event::Signal> cb) : callback(std::move(cb)) {}
 };
 
 } // namespace internal
@@ -180,13 +180,13 @@ class Loop {
    * descriptors. Otherwise, it will be added. It is an error to try to add a file descriptor
    * already monitored, or to remove a file descriptor that's not monitored.
    *
-   * If \p owned is set, the loop takes ownership of the callback object, and will destroy it when
-   * the file descriptor is removed (or the loop is destroyed).
+   * If the callback pointer is owned, the callback will be destroyed when the file descriptor is
+   * removed (or the loop is destroyed).
    */
-  void ReadFd(int fd, FdReader* callback = nullptr, bool owned = false);
+  void ReadFd(int fd, base::optional_ptr<FdReader> callback = nullptr);
   /** \overload */
   void ReadFd(int fd, const std::function<void(int)>& callback) {
-    ReadFd(fd, new FdReaderF(callback), true /* owned */);
+    ReadFd(fd, base::make_owned<FdReaderF>(callback));
   }
 
   /**
@@ -196,13 +196,13 @@ class Loop {
    * descriptors. Otherwise, it will be added. It is an error to try to add a file descriptor
    * already monitored, or to remove a file descriptor that's not monitored.
    *
-   * If \p owned is set, the loop takes ownership of the callback object, and will destroy it when
-   * the file descriptor is removed (or the loop is destroyed).
+   * If the callback pointer is owned, the callback will be destroyed when the file descriptor is
+   * removed (or the loop is destroyed).
    */
-  void WriteFd(int fd, FdWriter* callback = nullptr, bool owned = false);
+  void WriteFd(int fd, base::optional_ptr<FdWriter> callback = nullptr);
   /** \overload */
   void WriteFd(int fd, const std::function<void(int)>& callback) {
-    WriteFd(fd, new FdWriterF(callback), true /* owned */);
+    WriteFd(fd, base::make_owned<FdWriterF>(callback));
   }
 
   /**
@@ -210,17 +210,17 @@ class Loop {
    *
    * This is a one-shot timer: after being called once, the timer is removed automatically.
    *
-   * If \p owned is set, the loop takes ownership of the callback object, and will destroy it when
-   * the timer elapses, is cancelled, or the loop is destroyed.
+   * If the callback pointer is owned, the callback will be destroyed when the timer elapses, is
+   * cancelled, or the loop is destroyed.
    */
   template <typename Duration>
-  TimerId Delay(Duration delay, Timed* callback, bool owned = false) {
-    return Delay_(std::chrono::duration_cast<base::TimerDuration>(delay), callback, owned);
+  TimerId Delay(Duration delay, base::optional_ptr<Timed> callback) {
+    return Delay_(std::chrono::duration_cast<base::TimerDuration>(delay), std::move(callback));
   }
   /** \overload */
   template <typename Duration>
   TimerId Delay(Duration delay, const std::function<void(bool)>& callback) {
-    return Delay(delay, new TimedF(callback), true /* owned */);
+    return Delay(delay, base::make_owned<TimedF>(callback));
   }
 
   /**
@@ -234,7 +234,7 @@ class Loop {
   /**
    * Registers a listener for signal \p signal.
    */
-  SignalId AddSignal(int signal, Signal* callback, bool owned = false);
+  SignalId AddSignal(int signal, base::optional_ptr<Signal> callback);
   /**
    * Removes a registered signal handler.
    */
@@ -243,12 +243,9 @@ class Loop {
   /**
    * Adds a listener for custom events from separate threads.
    *
-   * If \p owned is set, the loop takes ownership of the callback object, and will destroy it when
-   * the listener is removed or the loop is destroyed.
-   *
    * \sa Client, ClientLong, ClientPtr
    */
-  ClientId AddClient(Client* callback, bool owned = false);
+  ClientId AddClient(base::optional_ptr<Client> callback);
 
   /** Removes an existing client event registration. */
   bool RemoveClient(ClientId client);
@@ -303,7 +300,7 @@ class Loop {
 
   bool stop_ = false;  ///< `true` if a stop request is pending
 
-  TimerId Delay_(base::TimerDuration delay, Timed* callback, bool owned);
+  TimerId Delay_(base::TimerDuration delay, base::optional_ptr<Timed> callback);
   Fd* GetFd(int fd);
   void ReadTimer(int);
   void ReadSignal(int);
@@ -331,8 +328,9 @@ class Loop {
 template <typename C, void (C::*method)(long)>
 class ClientLong : public Client {
  public:
-  /** Constructs a callback on Loop \p l for object \p cb, both of which must outlive this object. */
-  ClientLong(Loop* l, C* cb) : loop_(l), id_(l->AddClient(this)), callback_(cb) {}
+  /** Constructs a callback on Loop \p l for object \p cb. Both must outlive this object. */
+  ClientLong(Loop* l, C* cb) : loop_(l), id_(l->AddClient(base::borrow(this))), callback_(cb) {}
+  ~ClientLong() { loop_->RemoveClient(id_); }
   /** Triggers the callback via a client event on the associated Loop. */
   void operator()(long n) { Client::Data d; d.n = n; loop_->PostClientEvent(id_, d); }
   /** Implements Client::Event by calling the callback. */
@@ -357,8 +355,9 @@ class ClientLong : public Client {
 template <typename T, typename C, void (C::*method)(std::unique_ptr<T>)>
 class ClientPtr : public Client {
  public:
-  /** Constructs a callback on Loop \p l for object \p cb, both of which must outlive this object. */
-  ClientPtr(Loop* l, C* cb) : loop_(l), id_(l->AddClient(this)), callback_(cb) {}
+  /** Constructs a callback on Loop \p l for object \p cb. Both must outlive this object. */
+  ClientPtr(Loop* l, C* cb) : loop_(l), id_(l->AddClient(base::borrow(this))), callback_(cb) {}
+  ~ClientPtr() { loop_->RemoveClient(id_); }
   /** Triggers the callback via a client event on the associated Loop. */
   void operator()(std::unique_ptr<T> p) { Client::Data d; d.p = p.release(); loop_->PostClientEvent(id_, d); }
   /** Implements Client::Event by calling the callback. */

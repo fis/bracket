@@ -37,9 +37,7 @@ int main(int argc, char *argv[]) {
 
   event::Loop loop;
   irc::Connection connection(config, &loop);
-
-  Reader reader;
-  connection.AddReader(&reader);
+  connection.AddReader(base::make_owned<Reader>());
 
   connection.Start();
   while (true)

@@ -142,7 +142,7 @@ void Connection::ConnectionOpen() {
   Send({ "NICK", config_.nick().c_str() });
   Send({ "USER", config_.user().c_str(), "0", "*", config_.realname().c_str() });
 
-  autojoin_timer_ = loop_->Delay(std::chrono::milliseconds(kAutojoinDelayMs), &autojoin_timer_callback_);
+  autojoin_timer_ = loop_->Delay(std::chrono::milliseconds(kAutojoinDelayMs), base::borrow(&autojoin_timer_callback_));
   // TODO: trigger autojoin prematurely on suitable numeric from server
 
   socket_->StartRead();
@@ -380,7 +380,7 @@ void Connection::CanWrite() {
     const auto& msg = write_queue_.front();
     int cost = 10 * msg.first + msg.second;
     int debt = std::max(cost - write_credit_, 0);
-    write_credit_timer_ = loop_->Delay(std::chrono::milliseconds(debt), &write_credit_timer_callback_);
+    write_credit_timer_ = loop_->Delay(std::chrono::milliseconds(debt), base::borrow(&write_credit_timer_callback_));
   }
 }
 
@@ -415,7 +415,7 @@ void Connection::ConnectionLost(const std::string& error) {
 
   current_server_ = (current_server_ + 1) % config_.servers_size();
 
-  reconnect_timer_ = loop_->Delay(std::chrono::milliseconds(reconnect_delay_ms), &reconnect_timer_callback_);
+  reconnect_timer_ = loop_->Delay(std::chrono::milliseconds(reconnect_delay_ms), base::borrow(&reconnect_timer_callback_));
 
   if (metric_connection_up_)
     metric_connection_up_->Set(0);

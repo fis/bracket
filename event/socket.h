@@ -239,8 +239,16 @@ struct ServerSocket::Watcher : public virtual base::Callback {
   virtual void Accepted(std::unique_ptr<Socket> socket) = 0;
 };
 
-std::unique_ptr<ServerSocket> ListenInet(Loop* loop, ServerSocket::Watcher* watcher, int port);
-std::unique_ptr<ServerSocket> ListenUnix(Loop* loop, ServerSocket::Watcher* watcher, const std::string& path, Socket::Kind kind = Socket::STREAM);
+std::unique_ptr<ServerSocket> ListenInet(
+    Loop* loop,
+    ServerSocket::Watcher* watcher,
+    int port);
+
+std::unique_ptr<ServerSocket> ListenUnix(
+    Loop* loop,
+    ServerSocket::Watcher* watcher,
+    const std::string& path,
+    Socket::Kind kind = Socket::STREAM);
 
 } // namespace event
 

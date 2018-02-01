@@ -10,24 +10,19 @@
 
 namespace proto {
 
-DelimReader::DelimReader(google::protobuf::io::ZeroCopyInputStream* stream, bool owned)
-    : stream_(stream), owned_(owned)
+DelimReader::DelimReader(base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
+    : stream_(std::move(stream))
 {}
 
 DelimReader::DelimReader(const char* path)
-    : DelimReader(OpenFileInputStream(path))
+    : DelimReader(base::own(OpenFileInputStream(path)))
 {}
-
-DelimReader::~DelimReader() {
-  if (owned_)
-    delete stream_;
-}
 
 bool DelimReader::Read(google::protobuf::Message* message, bool merge) {
   if (!merge)
     message->Clear();
 
-  google::protobuf::io::CodedInputStream coded(stream_);
+  google::protobuf::io::CodedInputStream coded(stream_.get());
 
   google::protobuf::uint64 size;
   if (!coded.ReadVarint64(&size))
@@ -43,7 +38,7 @@ bool DelimReader::Read(google::protobuf::Message* message, bool merge) {
 }
 
 bool DelimReader::Skip() {
-  google::protobuf::io::CodedInputStream coded(stream_);
+  google::protobuf::io::CodedInputStream coded(stream_.get());
 
   google::protobuf::uint64 size;
   if (!coded.ReadVarint64(&size))
@@ -52,28 +47,21 @@ bool DelimReader::Skip() {
   return coded.Skip(size);
 }
 
-DelimWriter::DelimWriter(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
-    : stream_(stream), owned_(owned), file_(nullptr)
+DelimWriter::DelimWriter(base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
+    : stream_(std::move(stream))
 {}
 
-DelimWriter::DelimWriter(const char* path)
-    : DelimWriter(nullptr, /* owned: */ false)
-{
-  file_ = OpenFileOutputStream(path).release();
-  stream_ = file_;
-  owned_ = true;
-}
-
-DelimWriter::~DelimWriter() {
-  if (owned_)
-    delete stream_;
+DelimWriter::DelimWriter(const char* path) {
+  auto file = OpenFileOutputStream(path);
+  file_ = file.get();
+  stream_ = base::own(std::move(file));
 }
 
 void DelimWriter::Write(const google::protobuf::Message& message) {
   const std::size_t size = message.ByteSizeLong();
 
   {
-    google::protobuf::io::CodedOutputStream coded(stream_);
+    google::protobuf::io::CodedOutputStream coded(stream_.get());
 
     coded.WriteVarint64(size);
 

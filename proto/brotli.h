@@ -11,9 +11,10 @@
 
 #include <brotli/decode.h>
 #include <brotli/encode.h>
-
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/stubs/common.h>
+
+#include "base/common.h"
 
 namespace proto {
 
@@ -23,15 +24,8 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   /** Constructs a wrapped file input stream. */
   static std::unique_ptr<BrotliInputStream> FromFile(const char* path);
 
-  /**
-   * Wraps \p stream with a brotli decompressor.
-   *
-   * If \p owned is `true`, the stream will be destroyed when this object is.
-   */
-  BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* stream, bool owned);
-  /** Wraps \p stream with a brotli decompressor, taking ownership of it. */
-  explicit BrotliInputStream(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
-      : BrotliInputStream(stream.release(), /* owned: */ true) {}
+  /** Wraps \p stream with a brotli decompressor. */
+  BrotliInputStream(base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream);
   ~BrotliInputStream();
 
   /** Implements google::protobuf::io::ZeroCopyInputStream::Next(). */
@@ -46,8 +40,7 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
  private:
   static constexpr std::size_t kInitialBufferSize = 4096;
 
-  google::protobuf::io::ZeroCopyInputStream* stream_;
-  bool owned_;
+  base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream_;
 
   const std::uint8_t* stream_chunk_ = nullptr;
   std::size_t stream_chunk_available_ = 0;
@@ -83,15 +76,8 @@ class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   /** Constructs a wrapped file output stream. */
   static std::unique_ptr<BrotliOutputStream> ToFile(const char* path);
 
-  /**
-   * Wraps \p stream with a brotli compressor.
-   *
-   * If \p owned is `true`, the stream will be destroyed when this object is.
-   */
-  BrotliOutputStream(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned);
-  /** Wraps \p stream with a brotli decompressor, taking ownership of it. */
-  explicit BrotliOutputStream(std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
-      : BrotliOutputStream(stream.release(), /* owned: */ true) {}
+  /** Wraps \p stream with a brotli compressor. */
+  BrotliOutputStream(base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream);
   ~BrotliOutputStream();
 
   /** Implements google::protobuf::io::ZeroCopyOutputStream::Next(). */
@@ -114,8 +100,7 @@ class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
  private:
   static constexpr std::size_t kInitialBufferSize = 4096;
 
-  google::protobuf::io::ZeroCopyOutputStream* stream_;
-  bool owned_;
+  base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream_;
 
   std::uint8_t* stream_chunk_ = nullptr;
   std::size_t stream_chunk_available_ = 0;

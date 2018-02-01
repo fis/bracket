@@ -15,16 +15,16 @@ TEST(BrotliTest, CompressedRoundtrip) {
   TestMessage input;
   input.set_payload("hello, world");
   {
-    BrotliOutputStream stream(
-        std::make_unique<google::protobuf::io::OstreamOutputStream>(&buffer));
+    google::protobuf::io::OstreamOutputStream raw_stream(&buffer);
+    BrotliOutputStream stream(base::borrow(&raw_stream));
     EXPECT_TRUE(input.SerializeToZeroCopyStream(&stream));
     EXPECT_TRUE(stream.Finish());
   }
 
   TestMessage output;
   {
-    BrotliInputStream stream(
-        std::make_unique<google::protobuf::io::IstreamInputStream>(&buffer));
+    google::protobuf::io::IstreamInputStream raw_stream(&buffer);
+    BrotliInputStream stream(base::borrow(&raw_stream));
     EXPECT_TRUE(output.ParseFromZeroCopyStream(&stream));
   }
 
@@ -36,9 +36,8 @@ TEST(BrotliTest, CompressedRoundtripMultiple) {
   std::stringstream buffer;
 
   {
-    DelimWriter writer(
-        std::make_unique<BrotliOutputStream>(
-            std::make_unique<google::protobuf::io::OstreamOutputStream>(&buffer)));
+    google::protobuf::io::OstreamOutputStream raw_stream(&buffer);
+    DelimWriter writer(base::make_owned<BrotliOutputStream>(base::borrow(&raw_stream)));
     TestMessage input;
     for (int i = 1; i <= kMessages; ++i) {
       input.set_number(i);
@@ -47,9 +46,8 @@ TEST(BrotliTest, CompressedRoundtripMultiple) {
   }
 
   {
-    DelimReader reader(
-        std::make_unique<BrotliInputStream>(
-            std::make_unique<google::protobuf::io::IstreamInputStream>(&buffer)));
+    google::protobuf::io::IstreamInputStream raw_stream(&buffer);
+    DelimReader reader(base::make_owned<BrotliInputStream>(base::borrow(&raw_stream)));
     TestMessage output;
     for (int i = 1; i <= kMessages; ++i) {
       reader.Read(&output);

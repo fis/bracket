@@ -9,19 +9,17 @@ constexpr std::size_t kMaxBufferSize = 16777216;
 } // unnamed namespace
 
 std::unique_ptr<BrotliInputStream> BrotliInputStream::FromFile(const char* path) {
-  return std::make_unique<BrotliInputStream>(OpenFileInputStream(path));
+  return std::make_unique<BrotliInputStream>(base::own(OpenFileInputStream(path)));
 }
 
-BrotliInputStream::BrotliInputStream(google::protobuf::io::ZeroCopyInputStream* stream, bool owned)
-    : stream_(stream), owned_(owned),
+BrotliInputStream::BrotliInputStream(base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
+    : stream_(std::move(stream)),
       brotli_(BrotliDecoderCreateInstance(nullptr, nullptr, nullptr))
 {}
 
 BrotliInputStream::~BrotliInputStream() {
   if (stream_chunk_available_ > 0)
     stream_->BackUp(stream_chunk_available_);
-  if (owned_)
-    delete stream_;
 }
 
 bool BrotliInputStream::Next(const void** data, int* size) {
@@ -110,18 +108,16 @@ bool BrotliInputStream::Skip(int count) {
 }
 
 std::unique_ptr<BrotliOutputStream> BrotliOutputStream::ToFile(const char* path) {
-  return std::make_unique<BrotliOutputStream>(OpenFileOutputStream(path));
+  return std::make_unique<BrotliOutputStream>(base::own(OpenFileOutputStream(path)));
 }
 
-BrotliOutputStream::BrotliOutputStream(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned)
-    : stream_(stream), owned_(owned),
+BrotliOutputStream::BrotliOutputStream(base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
+    : stream_(std::move(stream)),
       brotli_(BrotliEncoderCreateInstance(nullptr, nullptr, nullptr))
 {}
 
 BrotliOutputStream::~BrotliOutputStream() {
   Finish();
-  if (owned_)
-    delete stream_;
 }
 
 bool BrotliOutputStream::Next(void** data, int* size) {

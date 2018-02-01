@@ -14,23 +14,17 @@
 #include <google/protobuf/io/zero_copy_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 
+#include "base/common.h"
+
 namespace proto {
 
 /** Reader for a stream of length-delimited protobufs. */
 class DelimReader {
  public:
-  /**
-   * Constructs a reader from \p stream.
-   *
-   * If \p owned is `true`, the stream will be destroyed when this object is.
-   */
-  DelimReader(google::protobuf::io::ZeroCopyInputStream* stream, bool owned);
-  /** Constructs a reader from \p stream, taking ownership of it. */
-  explicit DelimReader(std::unique_ptr<google::protobuf::io::ZeroCopyInputStream> stream)
-      : DelimReader(stream.release(), /* owned: */ true) {}
+  /** Constructs a reader from \p stream. */
+  DelimReader(base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream);
   /** Constructs a reader from a file. */
   explicit DelimReader(const char* path);
-  ~DelimReader();
 
   /**
    * Reads the next message from the stream.
@@ -50,22 +44,14 @@ class DelimReader {
   bool Skip();
 
  private:
-  google::protobuf::io::ZeroCopyInputStream* stream_;
-  bool owned_;
+  base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream_;
 };
 
 /** Writer for a stream of length-delimited protobufs. */
 class DelimWriter {
  public:
-  /**
-   * Constructs a writer into \p stream.
-   *
-   * If \p owned is `true`, the stream will be destroyed when this object is.
-   */
-  DelimWriter(google::protobuf::io::ZeroCopyOutputStream* stream, bool owned);
-  /** Constructs a writer into \p stream, taking ownership of it. */
-  explicit DelimWriter(std::unique_ptr<google::protobuf::io::ZeroCopyOutputStream> stream)
-      : DelimWriter(stream.release(), /* owned: */ true) {}
+  /** Constructs a writer into \p stream. */
+  DelimWriter(base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream);
   /**
    * Constructs a writer into a file.
    *
@@ -73,15 +59,13 @@ class DelimWriter {
    * and opened in append mode.
    */
   explicit DelimWriter(const char* path);
-  ~DelimWriter();
 
   /** Writes \p message into the stream. */
   void Write(const google::protobuf::Message& message);
 
  private:
-  google::protobuf::io::ZeroCopyOutputStream* stream_;
-  bool owned_;
-  google::protobuf::io::FileOutputStream* file_;
+  base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream_;
+  google::protobuf::io::FileOutputStream* file_ = nullptr;
 };
 
 } // namespace proto
