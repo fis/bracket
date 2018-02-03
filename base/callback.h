@@ -196,7 +196,7 @@ class CallbackSet : public internal::CallbackContainer {
   void Add(base::optional_ptr<Iface> callback, CDatas&&... datas) {
     auto [holder, inserted] = callbacks_.try_emplace(callback.get(), std::move(callback), std::forward<CDatas>(datas)...);
     CHECK(inserted);
-    callback->RegisterContainer(this, holder->second.callback.get());
+    holder->second.callback->RegisterContainer(this, holder->second.callback.get());
   }
 
   /** Removes a callback from the set. */
@@ -317,7 +317,7 @@ class CallbackMap : public internal::CallbackContainer {
     if (!inserted) {
       // TODO: modify existing entry
     }
-    callback->RegisterContainer(this, (void*)&iter->first); // TODO figure out cast
+    iter->second->RegisterContainer(this, (void*)&iter->first); // TODO figure out cast
   }
   // TODO Key&& overload
 
