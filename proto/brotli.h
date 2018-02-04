@@ -35,7 +35,7 @@ class BrotliInputStream : public google::protobuf::io::ZeroCopyInputStream {
   /** Implements google::protobuf::io::ZeroCopyInputStream::Skip(). */
   bool Skip(int count) override;
   /** Implements google::protobuf::io::ZeroCopyInputStream::ByteCount(). */
-  google::protobuf::int64 ByteCount() const override { return byte_count_; }
+  google::protobuf::int64 ByteCount() const noexcept override { return byte_count_; }
 
  private:
   static constexpr std::size_t kInitialBufferSize = 4096;
@@ -85,10 +85,10 @@ class BrotliOutputStream : public google::protobuf::io::ZeroCopyOutputStream {
   /** Implements google::protobuf::io::ZeroCopyOutputStream::BackUp(). */
   void BackUp(int count) override;
   /** Implements google::protobuf::io::ZeroCopyOutputStream::ByteCount(). */
-  google::protobuf::int64 ByteCount() const override { return byte_count_; }
+  google::protobuf::int64 ByteCount() const noexcept override { return byte_count_; }
   // TODO: docs
   bool WriteAliasedRaw(const void* data, int size) override;
-  bool AllowsAliasing() const override { return true; }
+  bool AllowsAliasing() const noexcept override { return true; }
 
   /**
    * Ensures all data written so far has been passed to the underlying stream.
