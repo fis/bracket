@@ -189,7 +189,7 @@ class Connection : public event::Socket::Watcher {
   /** Called when the server socket has connected. */
   void ConnectionOpen() override;
   /** Called if the server socket fails to connect for any reason. */
-  void ConnectionFailed(const std::string& error) override;
+  void ConnectionFailed(std::unique_ptr<base::error> error) override;
   /** Called when the server socket is ready to read from. */
   void CanRead() override;
   /** Called when the server socket is ready to write to. */
@@ -202,7 +202,7 @@ class Connection : public event::Socket::Watcher {
   void WriteCreditTimer();
 
   /** Reverts back to idle state and starts the reconnect timer. */
-  void ConnectionLost(const std::string& error);
+  void ConnectionLost(std::unique_ptr<base::error> error);
   /** Called when it's time to try automatically reconnecting. */
   void ReconnectTimer();
 

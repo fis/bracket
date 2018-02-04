@@ -8,6 +8,7 @@
 
 #include "base/callback.h"
 #include "base/common.h"
+#include "base/exc.h"
 #include "event/socket.h"
 
 extern "C" {
@@ -34,12 +35,25 @@ namespace event {
 
 namespace internal {
 
-inline std::string ErrnoMessage(int errno_value) {
-  std::string message = std::generic_category().message(errno_value);
-  message += " (";
-  message += std::to_string(errno_value);
-  message += ')';
-  return message;
+class addr_error : public base::error {
+ public:
+  explicit addr_error(int errcode) : errcode_(errcode) {}
+
+  void format(std::string* str) const override;
+  void format(std::ostream* str) const override;
+
+ private:
+  int errcode_;
+};
+
+void addr_error::format(std::string* str) const {
+  auto err = gai_strerror(errcode_);
+  *str += "getaddrinfo: "; *str += (err ? err : "unknown error");
+}
+
+void addr_error::format(std::ostream* str) const {
+  auto err = gai_strerror(errcode_);
+  *str << "getaddrinfo: " << (err ? err : "unknown error");
 }
 
 /**
@@ -59,8 +73,8 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   void Start() override;
   void StartRead() override;
   void StartWrite() override;
-  std::size_t Read(void* buf, std::size_t count) override;
-  std::size_t Write(const void* buf, std::size_t count) override;
+  base::io_result Read(void* buf, std::size_t count) override;
+  base::io_result Write(const void* buf, std::size_t count) override;
 
   void WatchRead(bool watch);
   void WatchWrite(bool watch);
@@ -103,7 +117,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
     /** Pointer to a getaddrinfo(2) result list, once the results are ready. */
     AddrinfoPtr addrs;
     /** Error message from name resolution, if it failed. */
-    std::string error;
+    std::unique_ptr<base::error> error;
 
     /** Mutex guarding the #connection field. */
     std::mutex mutex;
@@ -160,7 +174,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Called if the connection attempt timeout expires. */
   void ConnectTimeout();
   /** Called to skip to the next available address when connection fails. */
-  void ConnectNext(const std::string& error);
+  void ConnectNext(std::unique_ptr<base::error> error);
 
   /** Called when the underlying socket is ready to read, according to poll. */
   void CanRead(int fd) override;
@@ -183,10 +197,8 @@ BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
     struct sockaddr_un* addr = &connect_addr_unix_->first;
     connect_addr_ = &connect_addr_unix_->second;
 
-    if (opt.unix_.length() + 1 > sizeof (addr->sun_path))
-      throw Exception("unix socket name too long: " + opt.unix_);
     addr->sun_family = AF_UNIX;
-    std::strcpy(addr->sun_path, opt.unix_.c_str());
+    std::strncpy(addr->sun_path, opt.unix_.c_str(), sizeof addr->sun_path);
 
     connect_addr_->ai_family = AF_UNIX;
     connect_addr_->ai_socktype = opt.kind_;
@@ -231,7 +243,7 @@ void BasicSocket::Start() {
     Connect();
   } else {
     state_ = kFailed;
-    watcher_.Call(&Watcher::ConnectionFailed, "internal error");
+    watcher_.Call(&Watcher::ConnectionFailed, base::make_os_error("internal error"));
   }
 }
 
@@ -246,11 +258,9 @@ void BasicSocket::Resolve(std::shared_ptr<ResolveData> data) {
   struct addrinfo *addrs;
   int ret = getaddrinfo(data->host.c_str(), data->port.c_str(), &hints, &addrs);
   if (ret != 0) {
-    data->error = "getaddrinfo: ";
-    const char* error = gai_strerror(ret);
-    data->error += error ? error : "unknown error";
+    data->error = std::make_unique<addr_error>(ret);
   } else if (!addrs) {
-    data->error = "getaddrinfo: no addresses";
+    data->error = base::make_os_error("getaddrinfo: no addresses");
   } else {
     data->addrs = AddrinfoPtr(addrs);
   }
@@ -265,14 +275,14 @@ void BasicSocket::Resolved(long) {
   CHECK(state_ == kResolving);
 
   connect_addr_inet_ = std::move(resolve_data_->addrs);
-  std::string error = std::move(resolve_data_->error);
+  auto error = std::move(resolve_data_->error);
   resolve_data_.reset();
   loop_->CancelTimer(resolve_timer_);
   resolve_timer_ = event::kNoTimer;
 
   if (!connect_addr_inet_) {
     state_ = kFailed;
-    watcher_.Call(&Watcher::ConnectionFailed, error);
+    watcher_.Call(&Watcher::ConnectionFailed, std::move(error));
     return;
   }
 
@@ -289,7 +299,7 @@ void BasicSocket::ResolveTimeout() {
     data->socket = nullptr;
   }
   state_ = kFailed;
-  watcher_.Call(&Watcher::ConnectionFailed, "name lookup timeout");
+  watcher_.Call(&Watcher::ConnectionFailed, base::make_os_error("name lookup timeout"));
 }
 
 void BasicSocket::Connect() {
@@ -298,11 +308,11 @@ void BasicSocket::Connect() {
 
   socket_ = socket(connect_addr_->ai_family, connect_addr_->ai_socktype, connect_addr_->ai_protocol);
   if (socket_ == -1) {
-    ConnectNext("socket: " + ErrnoMessage(errno));
+    ConnectNext(base::make_os_error("socket", errno));
     return;
   }
   if (fcntl(socket_, F_SETFL, O_NONBLOCK) == -1) {
-    ConnectNext("fnctl(O_NONBLOCK): " + ErrnoMessage(errno));
+    ConnectNext(base::make_os_error("fcntl(O_NONBLOCK)", errno));
     return;
   }
 
@@ -315,7 +325,7 @@ void BasicSocket::Connect() {
     // somehow connected immediately
     ConnectDone();
   } else {
-    ConnectNext("connect: " + ErrnoMessage(errno));
+    ConnectNext(base::make_os_error("connect", errno));
   }
 }
 
@@ -333,10 +343,10 @@ void BasicSocket::ConnectDone() {
 void BasicSocket::ConnectTimeout() {
   connect_timer_ = event::kNoTimer;
   loop_->WriteFd(socket_);
-  ConnectNext("connect timed out");
+  ConnectNext(base::make_os_error("connect timed out"));
 }
 
-void BasicSocket::ConnectNext(const std::string& error) {
+void BasicSocket::ConnectNext(std::unique_ptr<base::error> error) {
   if (connect_timer_ != kNoTimer) {
     loop_->CancelTimer(connect_timer_);
     connect_timer_ = kNoTimer;
@@ -349,7 +359,7 @@ void BasicSocket::ConnectNext(const std::string& error) {
 
   if (connect_addr_->ai_next) {
     LOG(WARNING)
-        << "connecting to " << *connect_addr_ << " failed (" << error
+        << "connecting to " << *connect_addr_ << " failed (" << *error
         << ") - trying next address";
     connect_addr_ = connect_addr_->ai_next;
     Connect();
@@ -357,7 +367,7 @@ void BasicSocket::ConnectNext(const std::string& error) {
   }
 
   state_ = kFailed;
-  watcher_.Call(&Watcher::ConnectionFailed, error);
+  watcher_.Call(&Watcher::ConnectionFailed, std::move(error));
 }
 
 void BasicSocket::CanRead(int fd) {
@@ -382,10 +392,10 @@ void BasicSocket::CanWrite(int fd) {
     socklen_t error_len = sizeof error;
 
     if (getsockopt(socket_, SOL_SOCKET, SO_ERROR, &error, &error_len) == -1) {
-      ConnectNext("getsockopt(SO_ERROR): " + ErrnoMessage(errno));
+      ConnectNext(base::make_os_error("getsockopt(SO_ERROR)", errno));
       return;
     } else if (error != 0) {
-      ConnectNext("connect: " + ErrnoMessage(error));
+      ConnectNext(base::make_os_error("connect", error));
       return;
     }
 
@@ -430,42 +440,42 @@ void BasicSocket::WatchWrite(bool watch) {
     loop_->WriteFd(socket_);
 }
 
-std::size_t BasicSocket::Read(void* buf, std::size_t count) {
+base::io_result BasicSocket::Read(void* buf, std::size_t count) {
   CHECK(state_ == kOpen);
 
   ssize_t ret = read(socket_, buf, count);
 
   if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
-    return 0;  // can't read any data without blocking
+    return base::io_result::ok(0);
 
   if (ret == -1)
-    throw Exception("read", errno);
+    return base::io_result::os_error("read", errno);
   if (ret == 0)
-    throw Exception("read: EOF");
+    return base::io_result::eof();
 
   if (read_started_) {
     read_started_ = false;
     loop_->ReadFd(socket_);
   }
-  return ret;
+  return base::io_result::ok(ret);
 }
 
-std::size_t BasicSocket::Write(const void* buf, std::size_t count) {
+base::io_result BasicSocket::Write(const void* buf, std::size_t count) {
   CHECK(state_ == kOpen);
 
   ssize_t ret = write(socket_, buf, count);
 
   if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
-    return 0;  // can't write any data without blocking
+    return base::io_result::ok(0);  // can't write any data without blocking
 
   if (ret == -1)
-    throw Exception("write", errno);
+    return base::io_result::os_error("write", errno);
 
   if (write_started_) {
     write_started_ = false;
     loop_->WriteFd(socket_);
   }
-  return ret;
+  return base::io_result::ok(ret);
 }
 
 /**
@@ -473,17 +483,19 @@ std::size_t BasicSocket::Write(const void* buf, std::size_t count) {
  */
 class TlsSocket : public Socket, public Socket::Watcher {
  public:
-  TlsSocket(const Socket::Builder& opt, BasicSocket::Family family);
+  TlsSocket(const Socket::Builder& opt, BasicSocket::Family family, Socket::Watcher* watcher);
   DISALLOW_COPY(TlsSocket);
   ~TlsSocket();
+
+  std::unique_ptr<base::error> LoadCert(const Socket::Builder& opt);
 
   void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
   void Start() override;
   void StartRead() override;
   void StartWrite() override;
-  std::size_t Read(void* buf, std::size_t count) override;
-  std::size_t Write(const void* buf, std::size_t count) override;
+  base::io_result Read(void* buf, std::size_t count) override;
+  base::io_result Write(const void* buf, std::size_t count) override;
 
  private:
   enum PendingOp {
@@ -507,7 +519,7 @@ class TlsSocket : public Socket, public Socket::Watcher {
   PendingOp pending_ = kNone;
 
   void ConnectionOpen() override;
-  void ConnectionFailed(const std::string& error) override;
+  void ConnectionFailed(std::unique_ptr<base::error> error) override;
   void CanRead() override;
   void CanWrite() override;
 
@@ -515,38 +527,48 @@ class TlsSocket : public Socket, public Socket::Watcher {
   void WatchWrite(bool watch);
 };
 
-/** Exception type for TLS library errors. */
-class TlsException : public Socket::Exception {
+/** Error type for TLS library errors. */
+class tls_error : public base::error {
  public:
-  /**
-   * Initializes a TLS exception.
-   *
-   * \param what error description
-   * \param tls_error TLS library error code
-   * \param ret TLS library function return code
-   */
-  explicit TlsException(const std::string& what, int tls_error = SSL_ERROR_SSL, int ret = -1);
+  tls_error(const char* what, int tls_code, int ret)
+      : what_(what), tls_code_(tls_code), ret_(ret)
+  {}
+
+  void format(std::string* str) const override;
+  void format(std::ostream* str) const override;
 
  private:
-  std::string Describe(const std::string& what, int tls_error, int ret) const noexcept;
+  const char* what_;
+  int tls_code_;
+  int ret_;
 };
 
-TlsSocket::TlsSocket(const Socket::Builder& opt, BasicSocket::Family family)
-    : socket_(opt, family, this), watcher_(base::borrow(opt.watcher_))
+std::unique_ptr<tls_error> make_tls_error(const char* what, int tls_code = SSL_ERROR_SSL, int ret = -1) {
+  return std::make_unique<tls_error>(what, tls_code, ret);
+}
+
+base::io_result tls_error_result(const char* what, int tls_code = SSL_ERROR_SSL, int ret = -1) {
+  return base::io_result::error(make_tls_error(what, tls_code, ret));
+}
+
+TlsSocket::TlsSocket(const Socket::Builder& opt, BasicSocket::Family family, Socket::Watcher* watcher)
+    : socket_(opt, family, this), watcher_(base::borrow(watcher))
 {
   ssl_ctx_ = bssl::UniquePtr<SSL_CTX>(SSL_CTX_new(TLS_method()));
   SSL_CTX_set_mode(ssl_ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+}
 
-  if (!opt.client_cert_.empty()) {
-    ERR_clear_error();
-    if (SSL_CTX_use_certificate_chain_file(ssl_ctx_.get(), opt.client_cert_.c_str()) != 1)
-      throw TlsException("can't load client certificate: " + opt.client_cert_);
+std::unique_ptr<base::error> TlsSocket::LoadCert(const Socket::Builder& opt) {
+  ERR_clear_error();
+  if (SSL_CTX_use_certificate_chain_file(ssl_ctx_.get(), opt.client_cert_.c_str()) != 1)
+    return base::make_file_error(opt.client_cert_, "can't load client certificate");
 
-    const auto& key = opt.client_key_.empty() ? opt.client_cert_ : opt.client_key_;
-    ERR_clear_error();
-    if (SSL_CTX_use_PrivateKey_file(ssl_ctx_.get(), key.c_str(), SSL_FILETYPE_PEM) != 1)
-      throw TlsException("can't load client private key: " + key);
-  }
+  const auto& key = opt.client_key_.empty() ? opt.client_cert_ : opt.client_key_;
+  ERR_clear_error();
+  if (SSL_CTX_use_PrivateKey_file(ssl_ctx_.get(), key.c_str(), SSL_FILETYPE_PEM) != 1)
+    return base::make_file_error(key, "can't load private key");
+
+  return nullptr;
 }
 
 TlsSocket::~TlsSocket() {}
@@ -575,7 +597,7 @@ void TlsSocket::StartWrite() {
     WatchWrite(true);
 }
 
-std::size_t TlsSocket::Read(void* buf, std::size_t count) {
+base::io_result TlsSocket::Read(void* buf, std::size_t count) {
   CHECK(ssl_);
   CHECK(pending_ != kWantReadForWrite && pending_ != kWantWriteForWrite);
 
@@ -590,16 +612,16 @@ std::size_t TlsSocket::Read(void* buf, std::size_t count) {
       if (write_watched_)
         WatchWrite(false);
       pending_ = kWantReadForRead;
-      return 0;
+      return base::io_result::ok(0);
     } else if (error == SSL_ERROR_WANT_WRITE) {
       if (read_watched_)
         WatchRead(false);
       if (!write_watched_)
         WatchWrite(true);
       pending_ = kWantWriteForRead;
-      return 0;
+      return base::io_result::ok(0);
     } else {
-      throw TlsException("TLS read", error, ret);
+      return tls_error_result("TLS read", error, ret);
     }
   }
 
@@ -613,10 +635,10 @@ std::size_t TlsSocket::Read(void* buf, std::size_t count) {
   else if (write_started_ && !write_watched_)
     WatchWrite(true);
 
-  return ret;
+  return base::io_result::ok(ret);
 }
 
-std::size_t TlsSocket::Write(const void* buf, std::size_t count) {
+base::io_result TlsSocket::Write(const void* buf, std::size_t count) {
   CHECK(ssl_);
   CHECK(pending_ != kWantReadForRead && pending_ != kWantWriteForRead);
 
@@ -631,16 +653,16 @@ std::size_t TlsSocket::Write(const void* buf, std::size_t count) {
       if (write_watched_)
         WatchWrite(false);
       pending_ = kWantReadForWrite;
-      return 0;
+      return base::io_result::ok(0);
     } else if (error == SSL_ERROR_WANT_WRITE) {
       if (read_watched_)
         WatchRead(false);
       if (!write_watched_)
         WatchWrite(true);
       pending_ = kWantReadForWrite;
-      return 0;
+      return base::io_result::ok(0);
     } else {
-      throw TlsException("TLS write", error, ret);
+      return tls_error_result("TLS write", error, ret);
     }
   }
 
@@ -654,7 +676,7 @@ std::size_t TlsSocket::Write(const void* buf, std::size_t count) {
   else if (read_started_ && !read_watched_)
     WatchRead(true);
 
-  return ret;
+  return base::io_result::ok(ret);
 }
 
 void TlsSocket::ConnectionOpen() {
@@ -665,8 +687,8 @@ void TlsSocket::ConnectionOpen() {
   watcher_.Call(&Socket::Watcher::ConnectionOpen);
 }
 
-void TlsSocket::ConnectionFailed(const std::string& error) {
-  watcher_.Call(&Socket::Watcher::ConnectionFailed, error);
+void TlsSocket::ConnectionFailed(std::unique_ptr<base::error> error) {
+  watcher_.Call(&Socket::Watcher::ConnectionFailed, std::move(error));
 }
 
 void TlsSocket::CanRead() {
@@ -705,27 +727,22 @@ void TlsSocket::WatchWrite(bool watch) {
   socket_.WatchWrite(watch);
 }
 
-TlsException::TlsException(const std::string& what, int tls_error, int ret)
-    : Socket::Exception(Describe(what, tls_error, ret))
-{
-}
-
 extern "C" int event_tlsexception_describe_callback(const char* str, std::size_t len, void* ctx_p) {
-  auto ctx = static_cast<std::pair<bool, std::string*>*>(ctx_p);
+  auto ctx = static_cast<std::pair<bool, std::string**>*>(ctx_p);
 
   if (ctx->first) {
-    *ctx->second += ", ";
+    **ctx->second += ", ";
   } else {
     ctx->first = true;
-    *ctx->second += " [";
+    **ctx->second += " [";
   }
 
-  *ctx->second += str;
+  **ctx->second += str;
 
   return 1;
 }
 
-std::string TlsException::Describe(const std::string& what, int tls_error, int ret) const noexcept {
+void tls_error::format(std::string* str) const {
   static const std::array<const char*, 8> messages = {
     /* SSL_ERROR_NONE: */ "success",
     /* SSL_ERROR_SSL: */ "library error",
@@ -737,66 +754,81 @@ std::string TlsException::Describe(const std::string& what, int tls_error, int r
     /* SSL_ERROR_WANT_CONNECT: */ "transport not connected",
   };
 
-  std::string desc(what);
+  *str += what_;
 
-  desc += ": ";
-  if (tls_error == SSL_ERROR_SYSCALL && ret == 0)
-    desc += "EOF";
-  else if (tls_error == SSL_ERROR_SYSCALL)
-    desc += ErrnoMessage(errno);
-  else if (tls_error >= 0 && (unsigned)tls_error < messages.size())
-    desc += messages[tls_error];
+  *str += ": ";
+  if (tls_code_ == SSL_ERROR_SYSCALL && ret_ == 0)
+    *str += "EOF";
+  else if (tls_code_ == SSL_ERROR_SYSCALL)
+    base::os_error(errno).format(str);
+  else if (tls_code_ >= 0 && (unsigned)tls_code_ < messages.size())
+    *str += messages[tls_code_];
   else
-    desc += "unknown TLS error";
+    *str += "unknown TLS error";
 
-  auto ctx = std::make_pair<bool, std::string*>(false, &desc);
+  auto ctx = std::make_pair<bool, std::string**>(false, &str);
   ERR_print_errors_cb(&event_tlsexception_describe_callback, &ctx);
   if (ctx.first)
-    desc += ']';
+    *str += ']';
+}
 
-  return desc;
+void tls_error::format(std::ostream* str) const {
+  std::string buffer; format(&buffer); *str << buffer;
 }
 
 class BasicServerSocket : public ServerSocket, public FdReader {
  public:
-  BasicServerSocket(
+  static base::maybe_ptr<ServerSocket> Create(
       Loop* loop,
       Watcher* watcher,
       int domain, int type, int proto,
       struct sockaddr* bind_addr, socklen_t bind_addr_len);
+
+  BasicServerSocket(Loop* loop, Watcher* watcher, int socket);
+
+  ~BasicServerSocket();
 
   void CanRead(int fd) override;
 
  private:
   Loop* loop_;
   base::CallbackPtr<Watcher> watcher_;
-
   int socket_;
 };
 
-BasicServerSocket::BasicServerSocket(
+base::maybe_ptr<ServerSocket> BasicServerSocket::Create(
     Loop* loop,
     Watcher* watcher,
     int domain, int type, int proto,
     struct sockaddr* bind_addr, socklen_t bind_addr_len)
-    : loop_(loop), watcher_(base::borrow(watcher))
 {
-  socket_ = socket(domain, type, proto);
-  if (socket_ == -1)
-    throw Socket::Exception("socket", errno);
-  if (fcntl(socket_, F_SETFL, O_NONBLOCK) == -1) {
-    close(socket_);
-    throw Socket::Exception("fnctl(O_NONBLOCK)", errno);
+  int s = socket(domain, type, proto);
+  if (s == -1)
+    return base::maybe_os_error<ServerSocket>("socket", errno);
+  if (fcntl(s, F_SETFL, O_NONBLOCK) == -1) {
+    close(s);
+    return base::maybe_os_error<ServerSocket>("fcntl(O_NONBLOCK)", errno);
   }
-  if (bind(socket_, bind_addr, bind_addr_len) == -1) {
-    close(socket_);
-    throw Socket::Exception("bind", errno);
+  if (bind(s, bind_addr, bind_addr_len) == -1) {
+    close(s);
+    return base::maybe_os_error<ServerSocket>("bind", errno);
   }
-  if (listen(socket_, SOMAXCONN) == -1) {
-    close(socket_);
-    throw Socket::Exception("listen", errno);
+  if (listen(s, SOMAXCONN) == -1) {
+    close(s);
+    return base::maybe_os_error<ServerSocket>("listen", errno);
   }
+  return base::maybe_ok<BasicServerSocket>(loop, watcher, s);
+}
+
+BasicServerSocket::BasicServerSocket(Loop* loop, Watcher* watcher, int socket)
+    : loop_(loop), watcher_(base::borrow(watcher)), socket_(socket)
+{
   loop->ReadFd(socket_, base::borrow(this));
+}
+
+BasicServerSocket::~BasicServerSocket() {
+  loop_->ReadFd(socket_);
+  close(socket_);
 }
 
 void BasicServerSocket::CanRead(int fd) {
@@ -805,8 +837,10 @@ void BasicServerSocket::CanRead(int fd) {
 
   if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
     return;  // try again in the next loop
-  if (ret == -1)
-    throw Socket::Exception("accept", errno);  // TODO: pass to Watcher instead
+  if (ret == -1) {
+    watcher_.Call(&Watcher::AcceptError, base::make_os_error("accept", errno));
+    return;
+  }
 
   auto new_socket = std::make_unique<BasicSocket>(loop_, ret);
   watcher_.Call(&Watcher::Accepted, std::move(new_socket));
@@ -814,41 +848,54 @@ void BasicServerSocket::CanRead(int fd) {
 
 } // namespace internal
 
-std::unique_ptr<Socket> Socket::Builder::Build() {
+base::maybe_ptr<Socket> Socket::Builder::Build(Socket::Watcher* watcher) const {
+  if (!watcher)
+    watcher = watcher_;
+
   CHECK(loop_);
-  CHECK(watcher_);
+  CHECK(watcher);
   CHECK(!tls_ || kind_ == Socket::STREAM);
 
   internal::BasicSocket::Family family;
-  if (!host_.empty() && !port_.empty())
+  if (!host_.empty() && !port_.empty()) {
     family = INET;
-  else if (!unix_.empty())
+  } else if (!unix_.empty()) {
+    if (unix_.length() + 1 > sizeof ((struct sockaddr_un*)nullptr)->sun_path)
+      return base::maybe_file_error<Socket>(unix_, "unix socket name too long");
     family = UNIX;
-  else
-    throw base::Exception("{host, port} or unix not specified in Socket::Builder");
+  } else {
+    return base::maybe_error<Socket>("{host, port} or unix not specified in Socket::Builder");
+  }
 
-  if (tls_)
-    return std::make_unique<internal::TlsSocket>(*this, family);
-  else
-    return std::make_unique<internal::BasicSocket>(*this, family, watcher_);
+  if (tls_) {
+    auto socket = std::make_unique<internal::TlsSocket>(*this, family, watcher);
+    if (!client_cert_.empty()) {
+      auto cert_error = socket->LoadCert(*this);
+      if (cert_error)
+        return base::maybe_error<Socket>(std::move(cert_error));
+    }
+    return base::maybe_ok_from<Socket>(std::move(socket));
+  }
+
+  return base::maybe_ok<internal::BasicSocket>(*this, family, watcher);
 }
 
-std::unique_ptr<ServerSocket> ListenInet(Loop* loop, ServerSocket::Watcher* watcher, int port) {
-  throw Socket::Exception("TODO: ListenInet");
+base::maybe_ptr<ServerSocket> ListenInet(Loop* loop, ServerSocket::Watcher* watcher, int port) {
+  return base::maybe_error<ServerSocket>("TODO: ListenInet not implemented");
 }
 
-std::unique_ptr<ServerSocket> ListenUnix(Loop* loop, ServerSocket::Watcher* watcher, const std::string& path, Socket::Kind kind) {
+base::maybe_ptr<ServerSocket> ListenUnix(Loop* loop, ServerSocket::Watcher* watcher, const std::string& path, Socket::Kind kind) {
   struct sockaddr_un addr;
 
   if (path.length() + 1 > sizeof (addr.sun_path))
-    throw Socket::Exception("unix socket name too long: " + path);
+    return base::maybe_file_error<ServerSocket>(path, "unix socket name too long");
 
   unlink(path.c_str());
 
   addr.sun_family = AF_UNIX;
   std::strcpy(addr.sun_path, path.c_str());
 
-  return std::make_unique<internal::BasicServerSocket>(
+  return internal::BasicServerSocket::Create(
       loop, watcher,
       AF_UNIX, kind, 0,
       (struct sockaddr*) &addr, sizeof addr);

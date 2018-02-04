@@ -117,7 +117,12 @@ void Connection::Start() {
         .client_cert(tls->client_cert())
         .client_key(tls->client_key());
 
-  socket_ = builder.Build();
+  auto maybe_socket = builder.Build();
+  if (!maybe_socket.ok()) {
+    ConnectionLost(maybe_socket.error());
+    return;
+  }
+  socket_ = maybe_socket.ptr();
   socket_->Start();
 }
 
@@ -147,18 +152,20 @@ void Connection::ConnectionOpen() {
     metric_connection_up_->Set(1);
 }
 
-void Connection::ConnectionFailed(const std::string& error) {
-  ConnectionLost(error);
+void Connection::ConnectionFailed(std::unique_ptr<base::error> error) {
+  ConnectionLost(std::move(error));
 }
 
 void Connection::CanRead() {
   std::size_t got;
 
-  try {
-    got = socket_->Read(read_buffer_.data() + read_buffer_used_, read_buffer_.size() - read_buffer_used_);
-  } catch (const event::Socket::Exception& e) {
-    ConnectionLost(e.what());
-    return;
+  {
+    base::io_result ret = socket_->Read(read_buffer_.data() + read_buffer_used_, read_buffer_.size() - read_buffer_used_);
+    if (!ret.ok()) {
+      ConnectionLost(ret.error());
+      return;
+    }
+    got = ret.size();
   }
 
   if (got == 0)
@@ -319,16 +326,14 @@ void Connection::CanWrite() {
       if (slice.size() == 0)
         break;
 
-      std::size_t ret;
-      try {
-        ret = socket_->Write(slice.data(), slice.size());
-      } catch (const event::Socket::Exception& e) {
-        ConnectionLost(e.what());
+      base::io_result ret = socket_->Write(slice.data(), slice.size());
+      if (!ret.ok()) {
+        ConnectionLost(ret.error());
         return;
       }
 
-      wrote += ret;
-      if ((std::size_t) ret != slice.size())
+      wrote += ret.size();
+      if (ret.size() != slice.size())
         break;  // couldn't fit all of it in
     }
 
@@ -385,7 +390,7 @@ void Connection::WriteCreditTimer() {
   socket_->StartWrite();
 }
 
-void Connection::ConnectionLost(const std::string& error) {
+void Connection::ConnectionLost(std::unique_ptr<base::error> error) {
   const Config::Server& server = config_.servers(current_server_);
 
   socket_.reset();
@@ -406,7 +411,7 @@ void Connection::ConnectionLost(const std::string& error) {
   int reconnect_delay_ms = config_.reconnect_delay_ms();
 
   LOG(WARNING)
-      << "connection to " << server << " lost (" << error
+      << "connection to " << server << " lost (" << *error
       << ") - trying next server in " << reconnect_delay_ms << " ms";
 
   current_server_ = (current_server_ + 1) % config_.servers_size();

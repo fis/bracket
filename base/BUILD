@@ -6,6 +6,7 @@ cc_library(
     name = "base",
     srcs = [
         "buffer.cc",
+        "exc.cc",
         "log.cc",
     ],
     hdrs = [

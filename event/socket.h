@@ -70,16 +70,16 @@ struct Socket {
   /**
    * Attempts to read from the socket, returning the number of bytes read.
    *
-   * If there was no data immediately available, returns zero. This does not finish the read, so
-   * there is no need to call StartRead() again. The Watcher::CanRead() method will be called when
-   * you should try again.
+   * If there was no data immediately available, returns a success with size 0. This does not finish
+   * the read, so there is no need to call StartRead() again. The Watcher::CanRead() method will be
+   * called when you should try again.
    *
    * For a TLS socket, it's not safe to call this method except as a response to the
    * Watcher::CanRead() callback. A TLS read may be left in a pending state (if renegotiation is
    * triggered). The implementation will make sure no Watcher::CanWrite() callbacks are delivered
    * until the pending read has finished.
    */
-  virtual std::size_t Read(void* buf, std::size_t count) = 0;
+  virtual base::io_result Read(void* buf, std::size_t count) = 0;
 
   /**
    * Attempts to write to the socket, returning the number of bytes written.
@@ -98,13 +98,7 @@ struct Socket {
    * time you call this method, you must pass in the same contents, to avoid unpredictable
    * behavior. Some of the bytes may already have been copied to the library data structures.
    */
-  virtual std::size_t Write(const void* buf, std::size_t count) = 0;
-
-  /** Exception class for indicating socket I/O errors. */
-  class Exception : public base::Exception {
-   public:
-    explicit Exception(const std::string& what, int errno_value = 0) : base::Exception(what, errno_value) {}
-  };
+  virtual base::io_result Write(const void* buf, std::size_t count) = 0;
 
  protected:
   Socket() {}
@@ -134,7 +128,7 @@ struct Socket::Watcher : public virtual base::Callback {
    *
    * Either this method or ConnectionOpen() is guaranteed to be called once.
    */
-  virtual void ConnectionFailed(const std::string& error) = 0;
+  virtual void ConnectionFailed(std::unique_ptr<base::error> error) = 0;
   /**
    * Called to indicate that you must read from the socket.
    *
@@ -168,9 +162,11 @@ class Socket::Builder {
   /**
    * Instantiates a socket using the currently set options.
    *
-   * At least the loop(), watcher(), host() and port() options need to be set.
+   * The loop() option must be set, as well as one of the target address options (either host() and
+   * port(), or unix()). The Socket::Watcher object must either be set via the watcher() option, or
+   * passed to the Build() call.
    */
-  std::unique_ptr<Socket> Build();
+  base::maybe_ptr<Socket> Build(Socket::Watcher* watcher = nullptr) const;
 
   /** Sets event loop to register the socket on (mandatory, must outlive the socket). */
   Builder& loop(Loop* v) { loop_ = v; return *this; }
@@ -237,14 +233,19 @@ struct ServerSocket::Watcher : public virtual base::Callback {
    * called; the connection is implicitly open after it's been accepted.
    */
   virtual void Accepted(std::unique_ptr<Socket> socket) = 0;
+
+  /**
+   * Called if the `accept(2)` system call fails. It may be a good idea to give up.
+   */
+  virtual void AcceptError(std::unique_ptr<base::error> error) = 0;
 };
 
-std::unique_ptr<ServerSocket> ListenInet(
+base::maybe_ptr<ServerSocket> ListenInet(
     Loop* loop,
     ServerSocket::Watcher* watcher,
     int port);
 
-std::unique_ptr<ServerSocket> ListenUnix(
+base::maybe_ptr<ServerSocket> ListenUnix(
     Loop* loop,
     ServerSocket::Watcher* watcher,
     const std::string& path,
