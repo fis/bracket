@@ -19,22 +19,20 @@ extern "C" {
 #include <unistd.h>
 }
 
-namespace event {
-
-namespace internal {
-
-// Logging and error message support.
-
-LOG_TYPE(struct addrinfo, log, ai) {
+std::ostream& operator<<(std::ostream& os, const addrinfo& ai) {
   char host[256], port[32];
   if (getnameinfo(ai.ai_addr, ai.ai_addrlen,
                   host, sizeof host, port, sizeof port,
                   NI_NUMERICHOST | NI_NUMERICSERV) == 0)
-    log << host << ':' << port;
+    os << host << ':' << port;
   else
-    log << "(unparseable)";
-  return log;
+    os << "(unparseable)";
+  return os;
 }
+
+namespace event {
+
+namespace internal {
 
 inline std::string ErrnoMessage(int errno_value) {
   std::string message = std::generic_category().message(errno_value);

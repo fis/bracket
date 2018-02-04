@@ -61,7 +61,7 @@ class LogEvent {
 
   /** Appends the provided argument to the current log message. */
   template <typename T>
-  LogEvent& operator<<(T v) { if (available && enabled_) message_ << v; return *this; }
+  LogEvent& operator<<(const T& v) { if (available && enabled_) message_ << v; return *this; }
 
   LogEvent(const LogEvent&) = delete;
   LogEvent& operator=(const LogEvent&) = delete;
@@ -119,11 +119,6 @@ class LogEvent<false> {
     ::base::LogEvent<true>(true, ::base::LogLevel::FATAL) << message; \
     throw ::base::Exception("FATAL: " message); \
   } while (0)
-
-/** Defines a log formatting function for a custom type. */
-#define LOG_TYPE(T, log, arg) \
-  template <bool available> \
-  ::base::LogEvent<available>& operator<<(::base::LogEvent<available>& log, const T& arg)
 
 #endif // BASE_LOG_H_
 

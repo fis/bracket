@@ -24,14 +24,10 @@ namespace irc {
 // Custom logging formatting for special types.
 // ============================================
 
-namespace {
-
-LOG_TYPE(Config::Server, log, server) {
-  log << server.host() << ':' << server.port();
-  return log;
+std::ostream& operator<<(std::ostream& os, const Config::Server& server) {
+  os << server.host() << ':' << server.port();
+  return os;
 }
-
-} // unnamed namespace
 
 // Connection implementation.
 // ==========================
