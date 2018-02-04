@@ -5,6 +5,21 @@
 
 namespace base {
 
+TEST(ByteViewTest, AccessBytes) {
+  byte data[6] = {1, 2, 3, 4, 5, 6};
+  byte_view view{data+2, 2};
+
+  EXPECT_EQ(view[0], 3);
+  EXPECT_EQ(view[1], 4);
+
+  view[0] = 7;
+  view[1] = 8;
+
+  EXPECT_EQ(data[0], 1); EXPECT_EQ(data[1], 2);
+  EXPECT_EQ(data[2], 7); EXPECT_EQ(data[3], 8);
+  EXPECT_EQ(data[4], 5); EXPECT_EQ(data[5], 6);
+}
+
 TEST(RingBufferTest, PushWrapAround) {
   ring_buffer buffer(16);
   auto* base = buffer.push(1).first.data();
@@ -33,6 +48,41 @@ TEST(RingBufferTest, PushWrapAround) {
   EXPECT_EQ(d2.second.size(), 6u);
 }
 
+TEST(RingBufferTest, PushContiguous) {
+  ring_buffer buffer(16);
+  auto* base = buffer.push(14).first.data();
+  std::memcpy(base, "abcdefghijklmn", 14);
+  buffer.pop(12);
+  auto* d = buffer.push_cont(8);
+  std::memcpy(d, "opqrstuv", 8);
+
+  EXPECT_EQ(buffer.size(), 10u);
+  EXPECT_EQ(d, base + 2);
+  EXPECT_EQ(std::memcmp(base, "mnopqrstuv", 10), 0);
+}
+
+TEST(RingBufferTest, PushFree) {
+  ring_buffer buffer(16);
+  auto* base = buffer.push(14).first.data();
+  buffer.pop(8);
+  EXPECT_EQ(buffer.size(), 6u);
+
+  auto tail = buffer.push_free();
+  EXPECT_EQ(buffer.size(), 8u);
+  EXPECT_EQ(tail.data(), base + 14);
+  EXPECT_EQ(tail.size(), 2u);
+
+  auto head = buffer.push_free();
+  EXPECT_EQ(buffer.size(), 16u);
+  EXPECT_EQ(head.data(), base);
+  EXPECT_EQ(head.size(), 8u);
+
+  auto resized = buffer.push_free();
+  EXPECT_EQ(buffer.size(), 32u);
+  EXPECT_EQ(resized.data(), &buffer[0] + 16);
+  EXPECT_EQ(resized.size(), 16u);
+}
+
 TEST(RingBufferTest, Unpush) {
   ring_buffer buffer(16);
   auto* base = buffer.push(1).first.data();
@@ -59,6 +109,22 @@ TEST(RingBufferTest, Unpush) {
   EXPECT_EQ(d2.first.data(), base + 14);
   EXPECT_EQ(d2.first.size(), 1u);
   EXPECT_FALSE(d2.second.valid());
+}
+
+TEST(RingBufferTest, ReadWritePrimitives) {
+  ring_buffer buffer(4);
+  buffer.write_i8(0x01);
+  buffer.write_u8(0x81);
+  buffer.write_i16(0x0203);
+  buffer.write_i16(0x8283);
+  buffer.write_i32(0x04050607);
+  buffer.write_u32(0x84858687);
+  EXPECT_EQ(buffer.read_u32(), 0x02038101);
+  EXPECT_EQ(buffer.read_i32(), 0x06078283);
+  EXPECT_EQ(buffer.read_u16(), 0x0405);
+  EXPECT_EQ(buffer.read_i16(), (std::int16_t)0x8687);
+  EXPECT_EQ(buffer.read_u8(), 0x85);
+  EXPECT_EQ(buffer.read_i8(), (std::int8_t)0x84);
 }
 
 TEST(RingBufferTest, Full) {
@@ -103,15 +169,15 @@ TEST(RingBufferTest, Resize) {
   EXPECT_FALSE(d.second.valid());
 }
 
-TEST(RingBufferTest, PushChar) {
+TEST(RingBufferTest, PushCharResize) {
   ring_buffer buffer(4);
 
   buffer.push(2);
-  buffer.push_byte('a');
-  buffer.push_byte('b');
+  buffer.write_u8('a');
+  buffer.write_u8('b');
   buffer.pop(2);
-  buffer.push_byte('c');
-  buffer.push_byte('d');
+  buffer.write_u8('c');
+  buffer.write_u8('d');
 
   auto d = buffer.front(4);
 
@@ -123,7 +189,7 @@ TEST(RingBufferTest, PushChar) {
   EXPECT_EQ(d.first.data(), d.second.data() + 2);
   EXPECT_TRUE(std::memcmp(d.second.data(), "cdab", 4) == 0);
 
-  buffer.push_byte('e');
+  buffer.write_u8('e');
   auto d2 = buffer.front(5);
 
   EXPECT_EQ(buffer.size(), 5u);

@@ -259,8 +259,8 @@ void Connection::Send(const Message& message) {
   if (write_size < kMaxContentSize)
     write_buffer_.unpush(kMaxContentSize - write_size);
 
-  write_buffer_.push_byte(13);
-  write_buffer_.push_byte(10);
+  write_buffer_.write_u8(13);
+  write_buffer_.write_u8(10);
 
   int cost = 1000;
   auto extra_cost_it = extra_cost.find(message.command());

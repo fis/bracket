@@ -60,4 +60,53 @@ void ReadText(const char* path, google::protobuf::Message* message) {
   }
 }
 
+bool RingBufferInputStream::Next(const void** data, int* size) {
+  Consume();
+
+  base::byte_view chunk = buffer_->next();
+
+  if (!chunk)
+    return false;
+
+  *data = chunk.data();
+  *size = chunk.size();
+  last_read_ = chunk.size();
+  byte_count_ += chunk.size();
+  return true;
+}
+
+void RingBufferInputStream::BackUp(int raw_count) {
+  unsigned count = static_cast<unsigned>(raw_count);
+  CHECK(count <= last_read_);
+  last_read_ -= count;
+}
+
+bool RingBufferInputStream::Skip(int raw_count) {
+  unsigned count = static_cast<unsigned>(raw_count);
+
+  Consume();
+
+  if (count > buffer_->size()) {
+    byte_count_ += buffer_->size();
+    buffer_->clear();
+    return false;
+  }
+
+  buffer_->pop(count);
+  return true;
+}
+
+bool RingBufferOutputStream::Next(void** data, int* size) {
+  base::byte_view chunk = buffer_->push_free();
+  *data = chunk.data();
+  *size = chunk.size();
+  byte_count_ += chunk.size();
+  return true;
+}
+
+void RingBufferOutputStream::BackUp(int count) {
+  buffer_->unpush(count);
+  byte_count_ -= count;
+}
+
 } // namespace proto
