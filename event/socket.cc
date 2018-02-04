@@ -134,7 +134,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Name resolution timeout in milliseconds. */
   int resolve_timeout_ms_ = Socket::Builder::kDefaultResolveTimeoutMs;
   /** Timer for timing out the name resolution thread, only valid in `kResolving` state. */
-  event::TimerId resolve_timer_;
+  event::TimerId resolve_timer_ = kNoTimer;
 
   /** Result list from `getaddrinfo`. Only valid in `kConnecting` state, for an inet socket. */
   AddrinfoPtr connect_addr_inet_;
