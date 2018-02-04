@@ -58,18 +58,20 @@ DelimWriter::DelimWriter(const char* path) {
 }
 
 void DelimWriter::Write(const google::protobuf::Message& message) {
-  const std::size_t size = message.ByteSizeLong();
+  const std::size_t message_size = message.ByteSizeLong();
+  const std::size_t header_size = google::protobuf::io::CodedOutputStream::VarintSize64(message_size);
 
   {
     google::protobuf::io::CodedOutputStream coded(stream_.get());
 
-    coded.WriteVarint64(size);
-
-    google::protobuf::uint8* buffer = coded.GetDirectBufferForNBytesAndAdvance(size);
-    if (buffer)
-      message.SerializeWithCachedSizesToArray(buffer);
-    else
+    google::protobuf::uint8* buffer = coded.GetDirectBufferForNBytesAndAdvance(header_size + message_size);
+    if (buffer) {
+      coded.WriteVarint64ToArray(message_size, buffer);
+      message.SerializeWithCachedSizesToArray(buffer + header_size);
+    } else {
+      coded.WriteVarint64(message_size);
       message.SerializeWithCachedSizes(&coded);
+    }
 
     if (coded.HadError())
       throw base::Exception("DelimWriter::Write failed");
