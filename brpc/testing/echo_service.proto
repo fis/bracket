@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package brpc.testing;
+
+import "brpc/options.proto";
+
+message EchoRequest {
+  string payload = 1;
+}
+
+message EchoResponse {
+  string payload = 1;
+}
+
+service EchoService {
+  rpc Ping (EchoRequest) returns (EchoResponse) { option (brpc).code = 0; }
+  rpc Stream (stream EchoRequest) returns (stream EchoResponse) { option (brpc).code = 1; }
+}

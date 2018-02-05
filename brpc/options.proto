@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package brpc;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.MethodOptions {
+  BrpcMethodOptions brpc = 52863;
+}
+
+message BrpcMethodOptions {
+  uint32 code = 1;
+}
