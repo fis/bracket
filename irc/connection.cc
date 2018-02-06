@@ -152,7 +152,7 @@ void Connection::ConnectionOpen() {
     metric_connection_up_->Set(1);
 }
 
-void Connection::ConnectionFailed(std::unique_ptr<base::error> error) {
+void Connection::ConnectionFailed(base::error_ptr error) {
   ConnectionLost(std::move(error));
 }
 
@@ -396,7 +396,7 @@ void Connection::WriteCreditTimer() {
   Flush();
 }
 
-void Connection::ConnectionLost(std::unique_ptr<base::error> error) {
+void Connection::ConnectionLost(base::error_ptr error) {
   const Config::Server& server = config_.servers(current_server_);
 
   socket_.reset();

@@ -26,7 +26,7 @@ class RpcCall;
 struct RpcEndpoint {
   virtual std::unique_ptr<google::protobuf::Message> RpcOpen(RpcCall* call) = 0;
   virtual void RpcMessage(RpcCall* call, const google::protobuf::Message& message) = 0;
-  virtual void RpcClose(RpcCall* call, std::unique_ptr<base::error> error) = 0;
+  virtual void RpcClose(RpcCall* call, base::error_ptr error) = 0;
 
   RpcEndpoint() = default;
   DISALLOW_COPY(RpcEndpoint);
@@ -36,7 +36,7 @@ struct RpcEndpoint {
 /** Server-side dispatcher interface returning endpoints for incoming method calls. */
 struct RpcDispatcher {
   virtual std::unique_ptr<RpcEndpoint> RpcOpen(std::uint32_t method) = 0;
-  virtual void RpcError(std::unique_ptr<base::error> error) = 0;
+  virtual void RpcError(base::error_ptr error) = 0;
 
   RpcDispatcher() = default;
   DISALLOW_COPY(RpcDispatcher);
@@ -68,10 +68,10 @@ class RpcCall : public event::Socket::Watcher, public event::Finishable {
   ~RpcCall();
 
   void Send(const google::protobuf::Message& message);
-  void Close(std::unique_ptr<base::error> error = nullptr); // TODO: fix flushing outgoing messages on close
+  void Close(base::error_ptr error = nullptr); // TODO: fix flushing outgoing messages on close
 
   void ConnectionOpen() override;
-  void ConnectionFailed(std::unique_ptr<base::error> error) override;
+  void ConnectionFailed(base::error_ptr error) override;
   void CanRead() override;
   void CanWrite() override;
 
@@ -93,7 +93,7 @@ class RpcCall : public event::Socket::Watcher, public event::Finishable {
   std::optional<std::size_t> message_size_;  // set if we should read a message next
   std::unique_ptr<google::protobuf::Message> read_message_;
 
-  std::unique_ptr<base::error> close_error_ = nullptr;
+  base::error_ptr close_error_ = nullptr;
 
   void Flush();
   void LoopFinished() override;
@@ -103,13 +103,13 @@ class RpcServer : public event::ServerSocket::Watcher {
  public:
   RpcServer(event::Loop* loop, RpcDispatcher* dispatcher) : loop_(loop), dispatcher_(dispatcher) {}
 
-  std::unique_ptr<base::error> Start(const std::string& path);
+  base::error_ptr Start(const std::string& path);
 
   void Accepted(std::unique_ptr<event::Socket> socket) override {
     calls_.emplace(loop_, this, std::move(socket), dispatcher_);
   }
 
-  void AcceptError(std::unique_ptr<base::error> error) override {
+  void AcceptError(base::error_ptr error) override {
     // TODO: consider differentiating this as a fatal error
     dispatcher_->RpcError(std::move(error));
   }

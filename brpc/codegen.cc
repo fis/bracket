@@ -51,7 +51,7 @@ const char kInterfaceMethodBidi[] =
     "  struct $method$Handler {\n"
     "    virtual void $method$Open($method$Call* call) = 0;\n"
     "    virtual void $method$Message($method$Call* call, const $reqType$& req) = 0;\n"
-    "    virtual void $method$Close($method$Call* call, ::std::unique_ptr<::base::error> error) = 0;\n"
+    "    virtual void $method$Close($method$Call* call, ::base::error_ptr error) = 0;\n"
     "    virtual ~$method$Handler() = default;\n"
     "  };\n"
     "  class $method$Call : public ::brpc::RpcEndpoint {\n"
@@ -64,11 +64,11 @@ const char kInterfaceMethodBidi[] =
     "    ::base::optional_ptr<$method$Handler> handler_;\n"
     "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall* call) override;\n"
     "    void RpcMessage(::brpc::RpcCall* call, const ::google::protobuf::Message& message) override;\n"
-    "    void RpcClose(::brpc::RpcCall* call, ::std::unique_ptr<::base::error> error) override;\n"
+    "    void RpcClose(::brpc::RpcCall* call, ::base::error_ptr error) override;\n"
     "  };\n"
     "  virtual ::base::optional_ptr<$method$Handler> $method$() = 0;\n\n";
 const char kInterfaceFooter[] =
-    "  virtual void $service$Error(::std::unique_ptr<::base::error> error) = 0;\n\n"
+    "  virtual void $service$Error(::base::error_ptr error) = 0;\n\n"
     "  virtual ~$service$Interface() = default;\n"
     "};\n\n";
 const char kInterfaceOutlineBidi[] =
@@ -80,7 +80,7 @@ const char kInterfaceOutlineBidi[] =
     "inline void $service$Interface::$method$Call::RpcMessage(::brpc::RpcCall*, const ::google::protobuf::Message& message) {\n"
     "  handler_->$method$Message(this, static_cast<const $reqType$&>(message));\n"
     "}\n\n"
-    "inline void $service$Interface::$method$Call::RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) {\n"
+    "inline void $service$Interface::$method$Call::RpcClose(::brpc::RpcCall*, ::base::error_ptr error) {\n"
     "  handler_->$method$Close(this, ::std::move(error));\n"
     "}\n\n";
 
@@ -88,7 +88,7 @@ const char kServerHeader[] =
     "class $service$Server : public ::brpc::RpcDispatcher {\n"
     " public:\n"
     "  $service$Server(::event::Loop* loop, ::base::optional_ptr<$service$Interface> impl) : server_(loop, this), impl_(::std::move(impl)) {}\n"
-    "  ::std::unique_ptr<::base::error> Start(const ::std::string& path) { return server_.Start(path); }\n"
+    "  ::base::error_ptr Start(const ::std::string& path) { return server_.Start(path); }\n"
     " private:\n";
 const char kServerEndpointSimple[] =
     "  class $method$Endpoint : public ::brpc::RpcEndpoint {\n"
@@ -98,13 +98,13 @@ const char kServerEndpointSimple[] =
     "    $service$Interface* impl_;\n"
     "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall*) override;\n"
     "    void RpcMessage(::brpc::RpcCall* call, const ::google::protobuf::Message& message) override;\n"
-    "    void RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) override;\n"
+    "    void RpcClose(::brpc::RpcCall*, ::base::error_ptr error) override;\n"
     "  };\n\n";
 const char kServerBody[] =
     "  ::brpc::RpcServer server_;\n"
     "  ::base::optional_ptr<$service$Interface> impl_;\n"
     "  ::std::unique_ptr<::brpc::RpcEndpoint> RpcOpen(::std::uint32_t method) override;\n"
-    "  void RpcError(::std::unique_ptr<::base::error> error) override;\n"
+    "  void RpcError(::base::error_ptr error) override;\n"
     "};\n\n";
 const char kServerOutlineSimple[] =
     "inline ::std::unique_ptr<::google::protobuf::Message> $service$Server::$method$Endpoint::RpcOpen(::brpc::RpcCall*) {\n"
@@ -116,7 +116,7 @@ const char kServerOutlineSimple[] =
     "    call->Send(resp);\n"
     "  call->Close();\n"
     "}\n\n"
-    "inline void $service$Server::$method$Endpoint::RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) {\n"
+    "inline void $service$Server::$method$Endpoint::RpcClose(::brpc::RpcCall*, ::base::error_ptr error) {\n"
     "  if (error) impl_->$service$Error(::std::move(error));\n"
     "}\n\n";
 const char kServerDispatcherHeader[] =
@@ -138,7 +138,7 @@ const char kServerDispatcherFooter[] =
     "  }\n"
     "  return nullptr;\n"
     "}\n\n"
-    "inline void $service$Server::RpcError(::std::unique_ptr<::base::error> error) {\n"
+    "inline void $service$Server::RpcError(::base::error_ptr error) {\n"
     "  impl_->$service$Error(::std::move(error));\n"
     "}\n\n";
 
@@ -150,7 +150,7 @@ const char kClientHeader[] =
 const char kClientPublicMethodSimple[] =
     "  struct $method$Receiver {\n"
     "    virtual void $method$Done(const $respType$& resp) = 0;\n"
-    "    virtual void $method$Failed(::std::unique_ptr<::base::error> error) = 0;\n"
+    "    virtual void $method$Failed(::base::error_ptr error) = 0;\n"
     "    virtual ~$method$Receiver() = default;\n"
     "  };\n"
     "  void $method$(const $reqType$& req, ::base::optional_ptr<$method$Receiver> receiver);\n\n";
@@ -159,7 +159,7 @@ const char kClientPublicMethodBidi[] =
     "  struct $method$Receiver {\n"
     "    virtual void $method$Open($method$Call* call) = 0;\n"
     "    virtual void $method$Message($method$Call* call, const $respType$& req) = 0;\n"
-    "    virtual void $method$Close($method$Call* call, ::std::unique_ptr<::base::error> error) = 0;\n"
+    "    virtual void $method$Close($method$Call* call, ::base::error_ptr error) = 0;\n"
     "    virtual ~$method$Receiver() = default;\n"
     "  };\n"
     "  class $method$Call : public ::brpc::RpcEndpoint {\n"
@@ -172,7 +172,7 @@ const char kClientPublicMethodBidi[] =
     "    ::base::optional_ptr<$method$Receiver> receiver_;\n"
     "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall* call) override;\n"
     "    void RpcMessage(::brpc::RpcCall* call, const ::google::protobuf::Message& message) override;\n"
-    "    void RpcClose(::brpc::RpcCall* call, ::std::unique_ptr<::base::error> error) override;\n"
+    "    void RpcClose(::brpc::RpcCall* call, ::base::error_ptr error) override;\n"
     "  };\n"
     "  $method$Call* $method$(::base::optional_ptr<$method$Receiver> receiver);\n\n";
 const char kClientPrivateHeader[] =
@@ -186,7 +186,7 @@ const char kClientPrivateMethodSimple[] =
     "    bool received_ = false;\n"
     "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall*) override;\n"
     "    void RpcMessage(::brpc::RpcCall* call, const ::google::protobuf::Message& message) override;\n"
-    "    void RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) override;\n"
+    "    void RpcClose(::brpc::RpcCall*, ::base::error_ptr error) override;\n"
     "  };\n\n";
 const char kClientFooter[] =
     "  ::brpc::RpcClient client_;\n"
@@ -202,7 +202,7 @@ const char kClientOutlineSimple[] =
     "  }\n"
     "  call->Close();\n"
     "}\n\n"
-    "inline void $service$Client::$method$Endpoint::RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) {\n"
+    "inline void $service$Client::$method$Endpoint::RpcClose(::brpc::RpcCall*, ::base::error_ptr error) {\n"
     "  if (!received_) {\n"
     "    receiver_->$method$Failed(error ? ::std::move(error) : ::base::make_error(\"no answer\"));\n"
     "    received_ = true;\n"
@@ -220,7 +220,7 @@ const char kClientOutlineBidi[] =
     "inline void $service$Client::$method$Call::RpcMessage(::brpc::RpcCall*, const ::google::protobuf::Message& message) {\n"
     "  receiver_->$method$Message(this, static_cast<const $respType$&>(message));\n"
     "}\n\n"
-    "inline void $service$Client::$method$Call::RpcClose(::brpc::RpcCall*, ::std::unique_ptr<::base::error> error) {\n"
+    "inline void $service$Client::$method$Call::RpcClose(::brpc::RpcCall*, ::base::error_ptr error) {\n"
     "  receiver_->$method$Close(this, ::std::move(error));\n"
     "}\n\n"
     "inline $service$Client::$method$Call* $service$Client::$method$(::base::optional_ptr<$method$Receiver> receiver) {\n"

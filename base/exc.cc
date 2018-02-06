@@ -31,11 +31,11 @@ void string_error::format(std::ostream* str) const { *str << what_; }
 
 } // namespace internal
 
-std::unique_ptr<error> make_error(const char* what) {
+error_ptr make_error(const char* what) {
   return std::make_unique<internal::cstr_error>(what);
 }
 
-std::unique_ptr<error> make_error(const std::string& what) {
+error_ptr make_error(const std::string& what) {
   return std::make_unique<internal::string_error>(what);
 }
 

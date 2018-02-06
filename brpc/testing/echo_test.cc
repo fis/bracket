@@ -14,7 +14,7 @@ class StreamTestService : public EchoServiceInterface::StreamHandler {
     call->Send(resp);
   }
 
-  void StreamClose(EchoServiceInterface::StreamCall* call, std::unique_ptr<base::error> error) override {
+  void StreamClose(EchoServiceInterface::StreamCall* call, base::error_ptr error) override {
     if (error)
       FAIL() << "Stream call error: " << *error;
   }
@@ -32,7 +32,7 @@ class TestService : public EchoServiceInterface {
     return base::borrow(&kStreamService);
   }
 
-  void EchoServiceError(std::unique_ptr<base::error> error) override {
+  void EchoServiceError(base::error_ptr error) override {
     FAIL() << "RPC service error: " << *error;
   }
 };
@@ -75,7 +75,7 @@ struct PingTest : public LoopTimeoutTest, public EchoServiceClient::PingReceiver
     Stop();
   }
 
-  void PingFailed(std::unique_ptr<base::error> error) override {
+  void PingFailed(base::error_ptr error) override {
     FAIL() << "Ping error: " << *error;
     Stop();
   }

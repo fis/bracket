@@ -116,7 +116,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
     /** Pointer to a getaddrinfo(2) result list, once the results are ready. */
     AddrinfoPtr addrs;
     /** Error message from name resolution, if it failed. */
-    std::unique_ptr<base::error> error;
+    base::error_ptr error;
 
     /** Mutex guarding the #connection field. */
     std::mutex mutex;
@@ -173,7 +173,7 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Called if the connection attempt timeout expires. */
   void ConnectTimeout();
   /** Called to skip to the next available address when connection fails. */
-  void ConnectNext(std::unique_ptr<base::error> error);
+  void ConnectNext(base::error_ptr error);
 
   /** Called when the underlying socket is ready to read, according to poll. */
   void CanRead(int fd) override;
@@ -345,7 +345,7 @@ void BasicSocket::ConnectTimeout() {
   ConnectNext(base::make_os_error("connect timed out"));
 }
 
-void BasicSocket::ConnectNext(std::unique_ptr<base::error> error) {
+void BasicSocket::ConnectNext(base::error_ptr error) {
   if (connect_timer_ != kNoTimer) {
     loop_->CancelTimer(connect_timer_);
     connect_timer_ = kNoTimer;
@@ -470,7 +470,7 @@ class TlsSocket : public Socket, public Socket::Watcher {
   DISALLOW_COPY(TlsSocket);
   ~TlsSocket();
 
-  std::unique_ptr<base::error> LoadCert(const Socket::Builder& opt);
+  base::error_ptr LoadCert(const Socket::Builder& opt);
 
   void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
@@ -510,7 +510,7 @@ class TlsSocket : public Socket, public Socket::Watcher {
   PendingOp pending_ = kNone;
 
   void ConnectionOpen() override;
-  void ConnectionFailed(std::unique_ptr<base::error> error) override;
+  void ConnectionFailed(base::error_ptr error) override;
   void CanRead() override;
   void CanWrite() override;
 
@@ -534,7 +534,7 @@ class tls_error : public base::error {
   int ret_;
 };
 
-std::unique_ptr<tls_error> make_tls_error(const char* what, int tls_code = SSL_ERROR_SSL, int ret = -1) {
+base::error_ptr make_tls_error(const char* what, int tls_code = SSL_ERROR_SSL, int ret = -1) {
   return std::make_unique<tls_error>(what, tls_code, ret);
 }
 
@@ -549,7 +549,7 @@ TlsSocket::TlsSocket(const Socket::Builder& opt, BasicSocket::Family family, Soc
   SSL_CTX_set_mode(ssl_ctx_.get(), SSL_MODE_ENABLE_PARTIAL_WRITE | SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
 }
 
-std::unique_ptr<base::error> TlsSocket::LoadCert(const Socket::Builder& opt) {
+base::error_ptr TlsSocket::LoadCert(const Socket::Builder& opt) {
   ERR_clear_error();
   if (SSL_CTX_use_certificate_chain_file(ssl_ctx_.get(), opt.client_cert_.c_str()) != 1)
     return base::make_file_error(opt.client_cert_, "can't load client certificate");
@@ -670,7 +670,7 @@ void TlsSocket::ConnectionOpen() {
   watcher_.Call(&Socket::Watcher::ConnectionOpen);
 }
 
-void TlsSocket::ConnectionFailed(std::unique_ptr<base::error> error) {
+void TlsSocket::ConnectionFailed(base::error_ptr error) {
   watcher_.Call(&Socket::Watcher::ConnectionFailed, std::move(error));
 }
 

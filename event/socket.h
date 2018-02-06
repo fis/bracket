@@ -146,7 +146,7 @@ struct Socket::Watcher : public virtual base::Callback {
    *
    * Either this method or ConnectionOpen() is guaranteed to be called once.
    */
-  virtual void ConnectionFailed(std::unique_ptr<base::error> error) = 0;
+  virtual void ConnectionFailed(base::error_ptr error) = 0;
   /** Called to indicate that you can safely read from the socket and expect some bytes. */
   virtual void CanRead() = 0;
   /**
@@ -244,7 +244,7 @@ struct ServerSocket::Watcher : public virtual base::Callback {
   /**
    * Called if the `accept(2)` system call fails. It may be a good idea to give up.
    */
-  virtual void AcceptError(std::unique_ptr<base::error> error) = 0;
+  virtual void AcceptError(base::error_ptr error) = 0;
 };
 
 base::maybe_ptr<ServerSocket> ListenInet(

@@ -78,7 +78,7 @@ void RpcCall::Send(const google::protobuf::Message& message) {
   Flush();
 }
 
-void RpcCall::Close(std::unique_ptr<base::error> error) {
+void RpcCall::Close(base::error_ptr error) {
   if (state_ == State::kClosed)
     return;
   state_ = State::kClosed;
@@ -102,7 +102,7 @@ void RpcCall::ConnectionOpen() {
   socket_->WantRead(true);
 }
 
-void RpcCall::ConnectionFailed(std::unique_ptr<base::error> error) {
+void RpcCall::ConnectionFailed(base::error_ptr error) {
   Close(std::move(error));
 }
 
@@ -246,7 +246,7 @@ void RpcCall::LoopFinished() {
     std::get<RpcClient*>(host_)->CloseCall(this);
 }
 
-std::unique_ptr<base::error> RpcServer::Start(const std::string& path) {
+base::error_ptr RpcServer::Start(const std::string& path) {
   auto ret = event::ListenUnix(loop_, this, path);
   if (!ret.ok())
     return ret.error();
