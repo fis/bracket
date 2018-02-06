@@ -272,7 +272,7 @@ std::string FormatHeaderGuard(const std::string& filename) {
     else
       guard += '_';
   }
-  guard += "_H";
+  guard += "_H_";
   return guard;
 }
 
