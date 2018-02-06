@@ -194,6 +194,8 @@ class Connection : public event::Socket::Watcher {
   void CanRead() override;
   /** Called when the server socket is ready to write to. */
   void CanWrite() override;
+  /** Tries to flush as much of the send buffer as possible. */
+  void Flush();
 
   /** Handles an incoming message. */
   void HandleMessage(const Message& message);

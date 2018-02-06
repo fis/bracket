@@ -19,7 +19,7 @@ RpcCall::RpcCall(
     : loop_(loop), host_(server), state_(State::kDispatching), socket_(std::move(socket)), dispatcher_(dispatcher)
 {
   socket_->SetWatcher(this);
-  socket_->StartRead();
+  socket_->WantRead(true);
 }
 
 RpcCall::RpcCall(
@@ -99,7 +99,7 @@ void RpcCall::ConnectionOpen() {
   Flush();
   read_message_ = endpoint_->RpcOpen(this);
 
-  socket_->StartRead(); // TODO: support for permanent read mode
+  socket_->WantRead(true);
 }
 
 void RpcCall::ConnectionFailed(std::unique_ptr<base::error> error) {
@@ -126,8 +126,6 @@ void RpcCall::CanRead() {
     if (got.size() < chunk.size())
       break;  // likely no more bytes available right now
   }
-  if (total_read > 0 && !eof)
-    socket_->StartRead();
 
   if (state_ == State::kDispatching) {
     if (read_buffer_.size() < 4)
@@ -206,6 +204,16 @@ void RpcCall::Flush() {
   if (state_ != State::kReady)
     return;
 
+  if (write_buffer_.empty()) {
+    socket_->WantWrite(false);
+    return;
+  }
+
+  if (!socket_->safe_to_write()) {
+    socket_->WantWrite(true);
+    return;
+  }
+
   while (!write_buffer_.empty()) {
     base::byte_view chunk = write_buffer_.next();
     base::io_result wrote = socket_->Write(chunk.data(), chunk.size());
@@ -213,12 +221,12 @@ void RpcCall::Flush() {
       Close(wrote.error());
       return;
     }
-    if (wrote.size() == 0) {
-      socket_->StartWrite();
-      return;
-    }
+    if (wrote.size() == 0)
+      break;
     write_buffer_.pop(wrote.size());
   }
+
+  socket_->WantWrite(!write_buffer_.empty());
 }
 
 void RpcCall::LoopFinished() {

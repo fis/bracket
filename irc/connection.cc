@@ -146,7 +146,7 @@ void Connection::ConnectionOpen() {
   autojoin_timer_ = loop_->Delay(std::chrono::milliseconds(kAutojoinDelayMs), base::borrow(&autojoin_timer_callback_));
   // TODO: trigger autojoin prematurely on suitable numeric from server
 
-  socket_->StartRead();
+  socket_->WantRead(true);
 
   if (metric_connection_up_)
     metric_connection_up_->Set(1);
@@ -170,7 +170,6 @@ void Connection::CanRead() {
 
   if (got == 0)
     return;
-  socket_->StartRead();
 
   read_buffer_used_ += got;
   if (metric_received_bytes_)
@@ -282,12 +281,18 @@ void Connection::Send(const Message& message) {
 
   // TODO: don't try until a connection has been established
   if (was_empty)  // otherwise we're trying already
-    socket_->StartWrite();
+    Flush();
 }
 
 void Connection::CanWrite() {
-  if (write_queue_.empty())
-    return;  // actually, nothing to write
+  Flush();
+}
+
+void Connection::Flush() {
+  if (write_queue_.empty()) {  // nothing to write
+    socket_->WantWrite(false);
+    return;
+  }
 
   // update credit estimate
 
@@ -336,44 +341,45 @@ void Connection::CanWrite() {
       if (ret.size() != slice.size())
         break;  // couldn't fit all of it in
     }
-
-    if (wrote == 0)
-      return;  // wait for next round, write still started
   }
-
-  if (metric_sent_bytes_)
-    metric_sent_bytes_->Increment(wrote);
 
   // pop off what we managed to write
 
-  write_buffer_.pop(wrote);
-  if (metric_write_queue_bytes_)
-    metric_write_queue_bytes_->Set(write_buffer_.size());
+  if (wrote > 0) {
+    if (metric_sent_bytes_)
+      metric_sent_bytes_->Increment(wrote);
 
-  std::size_t pop = wrote;
-  while (pop > 0) {
-    CHECK(!write_queue_.empty());
-    auto& msg = write_queue_.front();
-    std::size_t first_bytes = msg.first;
-    if (first_bytes <= pop) {
-      pop -= first_bytes;
-      write_credit_ -= 10 * msg.first + msg.second;
-      write_queue_.pop_front();
-      if (metric_sent_lines_)
-        metric_sent_lines_->Increment();
-    } else {
-      msg.first -= pop;
-      write_credit_ -= 10 * pop;
-      break;
+    write_buffer_.pop(wrote);
+    if (metric_write_queue_bytes_)
+      metric_write_queue_bytes_->Set(write_buffer_.size());
+
+    std::size_t pop = wrote;
+    while (pop > 0) {
+      CHECK(!write_queue_.empty());
+      auto& msg = write_queue_.front();
+      std::size_t first_bytes = msg.first;
+      if (first_bytes <= pop) {
+        pop -= first_bytes;
+        write_credit_ -= 10 * msg.first + msg.second;
+        write_queue_.pop_front();
+        if (metric_sent_lines_)
+          metric_sent_lines_->Increment();
+      } else {
+        msg.first -= pop;
+        write_credit_ -= 10 * pop;
+        break;
+      }
     }
   }
 
-  // if we couldn't fit everything we can afford, start a new write
+  // if we couldn't fit everything we can afford, start waiting immediately
 
   if (wrote < can_write) {
-    socket_->StartWrite();
+    socket_->WantWrite(true);
     return;
   }
+
+  socket_->WantWrite(false);  // otherwise, nothing to write or need more credit
 
   // if we had anything left, see how long we need to wait to afford that
 
@@ -387,7 +393,7 @@ void Connection::CanWrite() {
 
 void Connection::WriteCreditTimer() {
   write_credit_timer_ = event::kNoTimer;
-  socket_->StartWrite();
+  Flush();
 }
 
 void Connection::ConnectionLost(std::unique_ptr<base::error> error) {

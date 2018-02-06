@@ -51,47 +51,47 @@ struct Socket {
   virtual void Start() = 0;
 
   /**
-   * Initiates an asynchronous read operation.
+   * Indicates the client is interested in reading from the socket.
    *
-   * The Watcher::CanRead() method will be called when you should call Read() on the socket. A
-   * successful read (one that returns any bytes, even if less than requested) will finish the
-   * operation, and you must call StartRead() again if you want to keep reading.
+   * When enabled, the Watcher::CanRead() method will be called whenever any bytes are available for
+   * #Read() on the socket. To avoid spinning, you should make sure you either consume the input or
+   * turn the flag off again.
    */
-  virtual void StartRead() = 0;
+  virtual void WantRead(bool enabled) = 0;
+
   /**
-   * Initiates an asynchronous write operation.
+   * Indicates the client is interested in writing to the socket.
    *
-   * The Watcher::CanWrite() method will be called when you should call Write() on the socket. A
-   * successful write (one that consumes any bytes, even if less than requested) will finish the
-   * operation, and you must call StartWrite() again if you still have more bytes to write.
+   * You may call #Write() at any time, but it may not write any bytes if the send queue is
+   * full. Enabling this will cause the Watcher::CanWrite() method to be called when you can again
+   * write some bytes. To avoid spinning, you should make sure to turn the flag off if you have
+   * nothing to write.
    */
-  virtual void StartWrite() = 0;
+  virtual void WantWrite(bool enabled) = 0;
 
   /**
    * Attempts to read from the socket, returning the number of bytes read.
    *
-   * If there was no data immediately available, returns a success with size 0. This does not finish
-   * the read, so there is no need to call StartRead() again. The Watcher::CanRead() method will be
-   * called when you should try again.
+   * If there was no data immediately available, returns a success with size 0. Use the
+   * WantRead(bool) method for getting a callback when to read.
    *
-   * For a TLS socket, it's not safe to call this method except as a response to the
-   * Watcher::CanRead() callback. A TLS read may be left in a pending state (if renegotiation is
-   * triggered). The implementation will make sure no Watcher::CanWrite() callbacks are delivered
-   * until the pending read has finished.
+   * For a TLS socket, it's not safe to call this method unless #safe_to_read() is true, or as a
+   * response to the Watcher::CanRead() callback. A TLS write may have been left in a pending state,
+   * which must be completed before the socket can be read from again. The implementation will make
+   * sure no Watcher::CanRead() callbacks are delivered until the pending write has finished.
    */
   virtual base::io_result Read(void* buf, std::size_t count) = 0;
 
   /**
    * Attempts to write to the socket, returning the number of bytes written.
    *
-   * If no bytes could be written without blocking, returns zero. This does not finish the write, so
-   * there is no need to call StartWrite() again. The Watcher::CanWrite() method will be called when
-   * you should try again.
+   * If no bytes could be written without blocking, returns zero. Use the WantWrite(bool) method for
+   * getting a callback when writing is possible.
    *
-   * For a TLS socket, it's not safe to call this method except as a response to the
-   * Watcher::CanWrite() callback. A TLS write may be left in a pending state (if renegotiation is
-   * triggered). The implementation will make sure no Watcher::CanWrite() callbacks are delivered
-   * until the pending read has finished.
+   * For a TLS socket, it's not safe to call this method unless #safe_tow_write() is true, or as a
+   * response to the Watcher::CanWrite() callback. A TLS read may have been left in a pending state,
+   * which must be completed before the socket can be written to again. The implementation will make
+   * sure no Watcher::CanWrite() callbacks are delivered until the pending read has finished.
    *
    * Also for a TLS socket, if you have already tried to write some bytes, you can no longer change
    * your mind afterwards. If the return value indicates that not all bytes were written, the next
@@ -99,6 +99,24 @@ struct Socket {
    * behavior. Some of the bytes may already have been copied to the library data structures.
    */
   virtual base::io_result Write(const void* buf, std::size_t count) = 0;
+
+  /**
+   * Returns `true` if it's okay to try reading from the socket.
+   *
+   * This does not guarantee there are any bytes available, only that it's okay to try. It's always
+   * okay to try reading from a plain socket, but TLS sockets have certain conditions. See #Read()
+   * for details.
+   */
+  virtual bool safe_to_read() const noexcept = 0;
+
+  /**
+   * Returns `true` if it's okay to try writing to the socket.
+   *
+   * This does not guarantee any bytes can be written, only that it's okay to try. It's always okay
+   * to try writing to a plain socket, but TLS sockets have certain conditions. See #Write() for
+   * details.
+   */
+  virtual bool safe_to_write() const noexcept = 0;
 
  protected:
   Socket() {}
@@ -129,24 +147,11 @@ struct Socket::Watcher : public virtual base::Callback {
    * Either this method or ConnectionOpen() is guaranteed to be called once.
    */
   virtual void ConnectionFailed(std::unique_ptr<base::error> error) = 0;
-  /**
-   * Called to indicate that you must read from the socket.
-   *
-   * This method is guaranteed to be called at least once (as long as the remote side sends any
-   * data) after issuing a Socket::StartRead() call. You should attempt to read some data with
-   * Socket::Read(). If the read does not return any bytes yet, this method will be called again
-   * later, at which point you should try again. If any bytes were read, this method will not be
-   * called any more, until you call Socket::StartRead() again.
-   */
+  /** Called to indicate that you can safely read from the socket and expect some bytes. */
   virtual void CanRead() = 0;
   /**
-   * Called to indicate that you must write to the socket.
-   *
-   * This method is guaranteed to be called at least once after issuing a Socket::StartWrite()
-   * call. You should attempt to write some data with Socket::Write(). If the write does not
-   * succeed in writing any data (returns 0), this method will be called again later, at which
-   * point you should try again. If any bytes were written, this method will not be called any
-   * more, until you call Socket::StartWrite() again.
+   * Called to indicate that you can safely write to the socket, and some bytes will likely get
+   * written.
    */
   virtual void CanWrite() = 0;
 };

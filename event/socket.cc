@@ -71,13 +71,12 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   void SetWatcher(Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
   void Start() override;
-  void StartRead() override;
-  void StartWrite() override;
+  void WantRead(bool enabled) override;
+  void WantWrite(bool enabled) override;
   base::io_result Read(void* buf, std::size_t count) override;
   base::io_result Write(const void* buf, std::size_t count) override;
-
-  void WatchRead(bool watch);
-  void WatchWrite(bool watch);
+  bool safe_to_read() const noexcept override { return true; }
+  bool safe_to_write() const noexcept override { return true; }
 
   // Internal interface for TlsSocket use only.
   int fd() const noexcept { return socket_; }
@@ -150,10 +149,10 @@ class BasicSocket : public Socket, public FdReader, public FdWriter {
   /** Socket file descriptor, only valid (not -1) in `kConnecting` or `kOpen` states. */
   int socket_ = -1;
 
-  /** `true` if there's a read operation pending. */
-  bool read_started_ = false;
-  /** `true` if there's a write operation pending. */
-  bool write_started_ = false;
+  /** `true` if the descriptor is being polled for reading. */
+  bool read_requested_ = false;
+  /** `true` if the descriptor is being polled for writing. */
+  bool write_requested_ = false;
 
   /**
    * Performs a blocking hostname resolution (in a separate thread).
@@ -406,38 +405,30 @@ void BasicSocket::CanWrite(int fd) {
   watcher_.Call(&Watcher::CanWrite);
 }
 
-void BasicSocket::StartRead() {
-  CHECK(!read_started_);
+void BasicSocket::WantRead(bool enabled) {
+  CHECK(state_ == kOpen);
   CHECK(!watcher_.empty());
 
-  read_started_ = true;
-  WatchRead(true);
+  if (read_requested_ != enabled) {
+    if (enabled)
+      loop_->ReadFd(socket_, base::borrow(this));
+    else
+      loop_->ReadFd(socket_);
+    read_requested_ = enabled;
+  }
 }
 
-void BasicSocket::StartWrite() {
-  CHECK(!write_started_);
+void BasicSocket::WantWrite(bool enabled) {
+  CHECK(state_ == kOpen);
   CHECK(!watcher_.empty());
 
-  write_started_ = true;
-  WatchWrite(true);
-}
-
-void BasicSocket::WatchRead(bool watch) {
-  CHECK(state_ == kOpen);
-
-  if (watch)
-    loop_->ReadFd(socket_, base::borrow(this));
-  else
-    loop_->ReadFd(socket_);
-}
-
-void BasicSocket::WatchWrite(bool watch) {
-  CHECK(state_ == kOpen);
-
-  if (watch)
-    loop_->WriteFd(socket_, base::borrow(this));
-  else
-    loop_->WriteFd(socket_);
+  if (write_requested_ != enabled) {
+    if (enabled)
+      loop_->WriteFd(socket_, base::borrow(this));
+    else
+      loop_->WriteFd(socket_);
+    write_requested_ = enabled;
+  }
 }
 
 base::io_result BasicSocket::Read(void* buf, std::size_t count) {
@@ -453,10 +444,6 @@ base::io_result BasicSocket::Read(void* buf, std::size_t count) {
   if (ret == 0)
     return base::io_result::eof();
 
-  if (read_started_) {
-    read_started_ = false;
-    loop_->ReadFd(socket_);
-  }
   return base::io_result::ok(ret);
 }
 
@@ -471,10 +458,6 @@ base::io_result BasicSocket::Write(const void* buf, std::size_t count) {
   if (ret == -1)
     return base::io_result::os_error("write", errno);
 
-  if (write_started_) {
-    write_started_ = false;
-    loop_->WriteFd(socket_);
-  }
   return base::io_result::ok(ret);
 }
 
@@ -492,10 +475,18 @@ class TlsSocket : public Socket, public Socket::Watcher {
   void SetWatcher(Socket::Watcher* watcher) override { watcher_.Set(base::borrow(watcher)); }
 
   void Start() override;
-  void StartRead() override;
-  void StartWrite() override;
+  void WantRead(bool enabled) override;
+  void WantWrite(bool enabled) override;
   base::io_result Read(void* buf, std::size_t count) override;
   base::io_result Write(const void* buf, std::size_t count) override;
+
+  bool safe_to_read() const noexcept override {
+    return pending_ != kWantReadForWrite && pending_ != kWantWriteForWrite;
+  }
+
+  bool safe_to_write() const noexcept override {
+    return pending_ != kWantReadForRead && pending_ != kWantWriteForRead;
+  }
 
  private:
   enum PendingOp {
@@ -512,8 +503,8 @@ class TlsSocket : public Socket, public Socket::Watcher {
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   bssl::UniquePtr<SSL> ssl_;
 
-  bool read_started_ = false;
-  bool write_started_ = false;
+  bool read_requested_ = false;
+  bool write_requested_ = false;
   bool read_watched_ = false;
   bool write_watched_ = false;
   PendingOp pending_ = kNone;
@@ -577,24 +568,22 @@ void TlsSocket::Start() {
   socket_.Start();
 }
 
-void TlsSocket::StartRead() {
+void TlsSocket::WantRead(bool enabled) {
   CHECK(ssl_);
-  CHECK(!read_started_);
   CHECK(!watcher_.empty());
 
-  read_started_ = true;
-  if (pending_ == kNone)
-    WatchRead(true);
+  read_requested_ = enabled;
+  if (pending_ == kNone && read_watched_ != read_requested_)
+    WatchRead(read_requested_);
 }
 
-void TlsSocket::StartWrite() {
+void TlsSocket::WantWrite(bool enabled) {
   CHECK(ssl_);
-  CHECK(!write_started_);
   CHECK(!watcher_.empty());
 
-  write_started_ = true;
-  if (pending_ == kNone)
-    WatchWrite(true);
+  write_requested_ = enabled;
+  if (pending_ == kNone && write_watched_ != write_requested_)
+    WatchWrite(write_requested_);
 }
 
 base::io_result TlsSocket::Read(void* buf, std::size_t count) {
@@ -625,15 +614,12 @@ base::io_result TlsSocket::Read(void* buf, std::size_t count) {
     }
   }
 
-  read_started_ = false;
-  if (read_watched_)
-    WatchRead(false);
-
   pending_ = kNone;
-  if (!write_started_ && write_watched_)
-    WatchWrite(false);
-  else if (write_started_ && !write_watched_)
-    WatchWrite(true);
+
+  if (read_watched_ != read_requested_)
+    WatchRead(read_requested_);
+  if (write_watched_ != write_requested_)
+    WatchWrite(write_requested_);
 
   return base::io_result::ok(ret);
 }
@@ -666,15 +652,12 @@ base::io_result TlsSocket::Write(const void* buf, std::size_t count) {
     }
   }
 
-  write_started_ = false;
-  if (write_watched_)
-    WatchWrite(false);
-
   pending_ = kNone;
-  if (!read_started_ && read_watched_)
-    WatchRead(false);
-  else if (read_started_ && !read_watched_)
-    WatchRead(true);
+
+  if (read_watched_ != read_requested_)
+    WatchRead(read_requested_);
+  if (write_watched_ != write_requested_)
+    WatchWrite(write_requested_);
 
   return base::io_result::ok(ret);
 }
@@ -693,7 +676,7 @@ void TlsSocket::ConnectionFailed(std::unique_ptr<base::error> error) {
 
 void TlsSocket::CanRead() {
   CHECK(pending_ != kWantWriteForRead && pending_ != kWantWriteForWrite);
-  CHECK(pending_ != kNone || read_started_);
+  CHECK(pending_ != kNone || read_requested_);
 
   if (pending_ == kNone || pending_ == kWantReadForRead)
     watcher_.Call(&Socket::Watcher::CanRead);
@@ -705,7 +688,7 @@ void TlsSocket::CanRead() {
 
 void TlsSocket::CanWrite() {
   CHECK(pending_ != kWantReadForRead && pending_ != kWantReadForWrite);
-  CHECK(pending_ != kNone || write_started_);
+  CHECK(pending_ != kNone || write_requested_);
 
   if (pending_ == kNone || pending_ == kWantWriteForWrite)
     watcher_.Call(&Socket::Watcher::CanWrite);
@@ -718,13 +701,13 @@ void TlsSocket::CanWrite() {
 void TlsSocket::WatchRead(bool watch) {
   CHECK(read_watched_ != watch);
   read_watched_ = watch;
-  socket_.WatchRead(watch);
+  socket_.WantRead(watch);
 }
 
 void TlsSocket::WatchWrite(bool watch) {
   CHECK(write_watched_ != watch);
   write_watched_ = watch;
-  socket_.WatchWrite(watch);
+  socket_.WantWrite(watch);
 }
 
 extern "C" int event_tlsexception_describe_callback(const char* str, std::size_t len, void* ctx_p) {
