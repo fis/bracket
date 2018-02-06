@@ -208,9 +208,9 @@ void Loop::PostClientEvent(ClientId client, Client::Data data) {
 }
 
 void Loop::Poll() {
-  CHECK(!fds_.empty()); // TODO: timer support (via timerfd?)
+  CHECK(!fds_.empty());
 
-  if (!fds_.empty() && pollfds_.empty()) {
+  if (pollfds_.empty()) {
     pollfds_.resize(fds_.size());
 
     std::size_t pollfd_index = 0;
@@ -267,6 +267,8 @@ void Loop::Poll() {
         fd_entry->second.reader.Call(&FdReader::CanRead, fd);
     }
   }
+
+  finishable_.Flush(&Finishable::LoopFinished);
 }
 
 TimerId Loop::Delay_(base::TimerDuration delay, base::optional_ptr<Timed> callback) {

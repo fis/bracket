@@ -8,9 +8,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <mutex>
-#include <queue>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -89,6 +89,12 @@ using TimerClock = base::TimerClock;
 using TimerPoint = base::TimerPoint;
 /** Alias for base::TimerDuration. */
 using TimerDuration = base::TimerDuration;
+
+/** Interface for registering cleanup handlers at end of each poll. */
+struct Finishable : public virtual base::Callback {
+  /** Called after the current/next round of poll event processing, in registration order. */
+  virtual void LoopFinished() = 0;
+};
 
 /** Interface for registering signals. */
 struct Signal : public virtual base::Callback {
@@ -231,13 +237,12 @@ class Loop {
    */
   void CancelTimer(TimerId timer) { timer_.Cancel(timer); }
 
-  /**
-   * Registers a listener for signal \p signal.
-   */
+  /** Registers a finisher handler to run after the current loop. */
+  void AddFinishable(base::optional_ptr<Finishable> callback) { finishable_.Add(std::move(callback)); }
+
+  /** Registers a listener for signal \p signal. */
   SignalId AddSignal(int signal, base::optional_ptr<Signal> callback);
-  /**
-   * Removes a registered signal handler.
-   */
+  /** Removes a registered signal handler. */
   void RemoveSignal(SignalId signal_id);
 
   /**
@@ -289,6 +294,8 @@ class Loop {
   std::vector<struct pollfd> pollfds_;
 
   Timer timer_;
+
+  base::CallbackQueue<Finishable> finishable_;
 
   std::unique_ptr<SignalFd> signal_fd_;
   internal::SignalMap signal_map_;
