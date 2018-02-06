@@ -82,8 +82,8 @@ struct PingTest : public LoopTimeoutTest, public EchoServiceClient::PingReceiver
 };
 
 TEST_F(PingTest, Roundtrip) {
-  EchoServiceServer server(base::borrow(&kTestService));
-  auto server_error = server.Start(&loop, "test.sock");
+  EchoServiceServer server(&loop, base::borrow(&kTestService));
+  auto server_error = server.Start("test.sock");
   if (server_error) FAIL() << *server_error;
 
   EchoServiceClient client;

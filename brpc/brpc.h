@@ -47,14 +47,16 @@ class RpcServer;
 class RpcClient;
 
 /** Active RPC call. Handles both the client and server ends. */
-class RpcCall : public event::Socket::Watcher {
+class RpcCall : public event::Socket::Watcher, public event::Finishable {
  public:
   RpcCall(
+      event::Loop* loop,
       RpcServer* server,
       std::unique_ptr<event::Socket> socket,
       RpcDispatcher* dispatcher);
 
   RpcCall(
+      event::Loop* loop,
       RpcClient* client,
       const event::Socket::Builder& target,
       std::unique_ptr<RpcEndpoint> endpoint,
@@ -74,6 +76,7 @@ class RpcCall : public event::Socket::Watcher {
   void CanWrite() override;
 
  private:
+  event::Loop* loop_;
   std::variant<RpcServer*, RpcClient*> host_;
 
   enum class State { kConnecting, kDispatching, kReady, kClosed };
@@ -90,17 +93,20 @@ class RpcCall : public event::Socket::Watcher {
   std::optional<std::size_t> message_size_;  // set if we should read a message next
   std::unique_ptr<google::protobuf::Message> read_message_;
 
+  std::unique_ptr<base::error> close_error_ = nullptr;
+
   void Flush();
+  void LoopFinished() override;
 };
 
 class RpcServer : public event::ServerSocket::Watcher {
  public:
-  RpcServer(RpcDispatcher* dispatcher) : dispatcher_(dispatcher) {}
+  RpcServer(event::Loop* loop, RpcDispatcher* dispatcher) : loop_(loop), dispatcher_(dispatcher) {}
 
-  std::unique_ptr<base::error> Start(event::Loop* loop, const std::string& path);
+  std::unique_ptr<base::error> Start(const std::string& path);
 
   void Accepted(std::unique_ptr<event::Socket> socket) override {
-    calls_.emplace(this, std::move(socket), dispatcher_);
+    calls_.emplace(loop_, this, std::move(socket), dispatcher_);
   }
 
   void AcceptError(std::unique_ptr<base::error> error) override {
@@ -111,6 +117,7 @@ class RpcServer : public event::ServerSocket::Watcher {
  private:
   friend class RpcCall;
 
+  event::Loop* loop_;
   RpcDispatcher* dispatcher_;
   std::unique_ptr<event::ServerSocket> socket_;
   base::unique_set<RpcCall> calls_;
@@ -123,7 +130,7 @@ class RpcClient {
   RpcClient() = default;
 
   RpcCall* Call(std::unique_ptr<RpcEndpoint> endpoint, std::uint32_t method, const google::protobuf::Message* message) {
-    return calls_.emplace(this, target_, std::move(endpoint), method, message);
+    return calls_.emplace(target_.loop(), this, target_, std::move(endpoint), method, message);
   }
 
   event::Socket::Builder& target() { return target_; }

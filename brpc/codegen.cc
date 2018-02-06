@@ -87,8 +87,8 @@ const char kInterfaceOutlineBidi[] =
 const char kServerHeader[] =
     "class $service$Server : public ::brpc::RpcDispatcher {\n"
     " public:\n"
-    "  $service$Server(::base::optional_ptr<$service$Interface> impl) : server_(this), impl_(::std::move(impl)) {}\n"
-    "  ::std::unique_ptr<::base::error> Start(::event::Loop* loop, const ::std::string& path) { return server_.Start(loop, path); }\n"
+    "  $service$Server(::event::Loop* loop, ::base::optional_ptr<$service$Interface> impl) : server_(loop, this), impl_(::std::move(impl)) {}\n"
+    "  ::std::unique_ptr<::base::error> Start(const ::std::string& path) { return server_.Start(path); }\n"
     " private:\n";
 const char kServerEndpointSimple[] =
     "  class $method$Endpoint : public ::brpc::RpcEndpoint {\n"

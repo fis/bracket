@@ -170,6 +170,8 @@ class Socket::Builder {
 
   /** Sets event loop to register the socket on (mandatory, must outlive the socket). */
   Builder& loop(Loop* v) { loop_ = v; return *this; }
+  /** Gets the currently set event loop. */
+  Loop* loop() const noexcept { return loop_; }
   /** Sets the callback object to use for events on the socket (mandatory, should outlive the socket). */
   Builder& watcher(Socket::Watcher* v) { watcher_ = v; return *this; }
   /** Sets the host name to connect to (mandatory unless `unix` is set). */

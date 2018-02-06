@@ -1,5 +1,6 @@
 #include <google/protobuf/io/coded_stream.h>
 
+#include "base/common.h"
 #include "brpc/brpc.h"
 #include "proto/util.h"
 
@@ -11,22 +12,24 @@ constexpr std::size_t kMaxVarintLen = 10;
 } // unnamed namespace
 
 RpcCall::RpcCall(
+    event::Loop* loop,
     RpcServer* server,
     std::unique_ptr<event::Socket> socket,
     RpcDispatcher* dispatcher)
-    : host_(server), state_(State::kDispatching), socket_(std::move(socket)), dispatcher_(dispatcher)
+    : loop_(loop), host_(server), state_(State::kDispatching), socket_(std::move(socket)), dispatcher_(dispatcher)
 {
   socket_->SetWatcher(this);
   socket_->StartRead();
 }
 
 RpcCall::RpcCall(
+    event::Loop* loop,
     RpcClient* client,
     const event::Socket::Builder& target,
     std::unique_ptr<RpcEndpoint> endpoint,
     std::uint32_t method,
     const google::protobuf::Message* message)
-    : host_(client), state_(State::kConnecting), endpoint_(std::move(endpoint))
+    : loop_(loop), host_(client), state_(State::kConnecting), endpoint_(std::move(endpoint))
 {
   write_buffer_.write_u32(method);
   if (message)
@@ -66,8 +69,10 @@ void RpcCall::Send(const google::protobuf::Message& message) {
       message.SerializeWithCachedSizes(&coded);
     }
 
-    if (coded.HadError())
+    if (coded.HadError()) {
       Close(base::make_error("RpcCall: protobuf serialization failed"));
+      return;
+    }
   }
 
   Flush();
@@ -76,22 +81,15 @@ void RpcCall::Send(const google::protobuf::Message& message) {
 void RpcCall::Close(std::unique_ptr<base::error> error) {
   if (state_ == State::kClosed)
     return;
-  bool dispatching = state_ == State::kDispatching;
   state_ = State::kClosed;
+
+  write_buffer_.clear();  // TODO: finish flushing output queue on non-error close
+  read_buffer_.clear();
 
   if (socket_)
     socket_.reset();
 
-  if (dispatching)
-    dispatcher_->RpcError(std::move(error));
-  else
-    endpoint_->RpcClose(this, std::move(error));
-
-  // will self-destroy
-  if (std::holds_alternative<RpcServer*>(host_))
-    std::get<RpcServer*>(host_)->CloseCall(this);
-  else
-    std::get<RpcClient*>(host_)->CloseCall(this);
+  loop_->AddFinishable(base::borrow(this));
 }
 
 void RpcCall::ConnectionOpen() {
@@ -147,7 +145,7 @@ void RpcCall::CanRead() {
     read_message_ = endpoint_->RpcOpen(this);
   }
 
-  while (true) {
+  while (state_ == State::kReady) {
     if (!message_size_) {
       // read the message header
 
@@ -186,7 +184,6 @@ void RpcCall::CanRead() {
 
       if (success) {
         endpoint_->RpcMessage(this, *read_message_);
-        // TODO: bug here: the call may have been closed/destroyed as a response to the message
       } else {
         Close(base::make_error("RpcCall: protobuf parsing failed"));
         return;
@@ -224,8 +221,25 @@ void RpcCall::Flush() {
   }
 }
 
-std::unique_ptr<base::error> RpcServer::Start(event::Loop* loop, const std::string& path) {
-  auto ret = event::ListenUnix(loop, this, path);
+void RpcCall::LoopFinished() {
+  // called to destroy this RpcCall without reentrancy issues
+
+  if (endpoint_)
+    endpoint_->RpcClose(this, std::move(close_error_));
+  else if (dispatcher_)
+    dispatcher_->RpcError(std::move(close_error_));
+  else  // impossible
+    LOG(ERROR) << "swallowed RPC error: " << *close_error_;
+
+  // will self-destroy
+  if (std::holds_alternative<RpcServer*>(host_))
+    std::get<RpcServer*>(host_)->CloseCall(this);
+  else
+    std::get<RpcClient*>(host_)->CloseCall(this);
+}
+
+std::unique_ptr<base::error> RpcServer::Start(const std::string& path) {
+  auto ret = event::ListenUnix(loop_, this, path);
   if (!ret.ok())
     return ret.error();
   socket_ = ret.ptr();
