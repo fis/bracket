@@ -292,7 +292,7 @@ class Loop {
 
   std::unique_ptr<SignalFd> signal_fd_;
   internal::SignalMap signal_map_;
-  base::owner_set<internal::SignalRecord> signals_;
+  base::unique_set<internal::SignalRecord> signals_;
 
   base::CallbackMap<ClientId, Client> clients_;
   ClientId next_client_id_ = 1;

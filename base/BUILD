@@ -16,7 +16,7 @@ cc_library(
         "enumarray.h",
         "exc.h",
         "log.h",
-        "owner_set.h",
+        "unique_set.h",
     ],
 )
 
@@ -35,4 +35,4 @@ load("//tools:gtest.bzl", "cc_gtest")
 
 cc_gtest(name = "buffer_test", deps = [":base"])
 cc_gtest(name = "enumarray_test", deps = [":base"])
-cc_gtest(name = "owner_set_test", deps = [":base"])
+cc_gtest(name = "unique_set_test", deps = [":base"])

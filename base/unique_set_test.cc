@@ -1,10 +1,10 @@
-#include "base/owner_set.h"
+#include "base/unique_set.h"
 #include "gtest/gtest.h"
 
 namespace base {
 
-TEST(OwnerSetTest, Size) {
-  owner_set<int> set;
+TEST(UniqueSetTest, Size) {
+  unique_set<int> set;
 
   EXPECT_EQ(set.size(), 0);
   int* p = set.emplace(123);
@@ -18,7 +18,7 @@ TEST(OwnerSetTest, Size) {
 }
 
 TEST(OwnerSetTest, Empty) {
-  owner_set<int> set;
+  unique_set<int> set;
 
   EXPECT_TRUE(set.empty());
   int* p = set.emplace(123);
@@ -34,7 +34,7 @@ TEST(OwnerSetTest, Empty) {
 TEST(OwnerSetTest, OwnershipTransfer) {
   std::unique_ptr<int> first = std::make_unique<int>(123);
   std::unique_ptr<int> last;
-  owner_set<int> set;
+  unique_set<int> set;
 
   EXPECT_TRUE((bool) first);
   EXPECT_FALSE((bool) last);
@@ -59,7 +59,7 @@ TEST(OwnerSetTest, OwnershipTransfer) {
 }
 
 TEST(OwnerSetTest, EraseNotFound) {
-  owner_set<int> set;
+  unique_set<int> set;
   set.emplace(123);
   auto q = std::make_unique<int>(456);
   bool erased = set.erase(q.get());
@@ -75,7 +75,7 @@ struct DestroySpy {
 };
 
 TEST(OwnerSetTest, DestroyOnErase) {
-  owner_set<DestroySpy> set;
+  unique_set<DestroySpy> set;
 
   bool a_destroyed = false;
   bool b_destroyed = false;
@@ -97,7 +97,7 @@ TEST(OwnerSetTest, DestroyOnErase) {
 TEST(OwnerSetTest, DestroyOnCleanup) {
   bool destroyed = false;
   {
-    owner_set<DestroySpy> set;
+    unique_set<DestroySpy> set;
     set.emplace(123, &destroyed);
   }
   EXPECT_TRUE(destroyed);

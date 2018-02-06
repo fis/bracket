@@ -15,7 +15,7 @@
 
 #include "base/buffer.h"
 #include "base/common.h"
-#include "base/owner_set.h"
+#include "base/unique_set.h"
 #include "event/socket.h"
 
 namespace brpc {
@@ -113,7 +113,7 @@ class RpcServer : public event::ServerSocket::Watcher {
 
   RpcDispatcher* dispatcher_;
   std::unique_ptr<event::ServerSocket> socket_;
-  base::owner_set<RpcCall> calls_;
+  base::unique_set<RpcCall> calls_;
 
   void CloseCall(RpcCall* call) { calls_.erase(call); }
 };
@@ -132,7 +132,7 @@ class RpcClient {
   friend class RpcCall;
 
   event::Socket::Builder target_;
-  base::owner_set<RpcCall> calls_;
+  base::unique_set<RpcCall> calls_;
 
   void CloseCall(RpcCall* call) { calls_.erase(call); }
 };

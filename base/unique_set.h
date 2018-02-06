@@ -16,21 +16,21 @@ namespace base {
 /**
  * Set of ownership-holding pointers.
  *
- * `base::owner_set<T>` has more or less the semantics of `std::unordered_set<std::unique_ptr<T>>`,
- * with the exception that it allows for deleting items based on a raw pointer to the item. It also
- * only implements some of the container methods.
+ * `base::unique_set<T>` has mostly the semantics of `std::unordered_set<std::unique_ptr<T>>`, with
+ * the exception that it allows for deleting items based on a raw pointer to the item. It also only
+ * implements some of the container methods.
  *
  * \tparam T type of contained objects
  */
 template<typename T>
-class owner_set {
+class unique_set {
  public:
   /** Constructs an empty set. */
-  owner_set() {}
-  DISALLOW_COPY(owner_set);
+  unique_set() {}
+  DISALLOW_COPY(unique_set);
 
   /** Destroys the set, and all the objects in it. */
-  ~owner_set() {
+  ~unique_set() {
     for (auto&& item : data_)
       delete item;
   }

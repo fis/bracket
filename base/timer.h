@@ -11,7 +11,7 @@
 #include <utility>
 
 #include "base/common.h"
-#include "base/owner_set.h"
+#include "base/unique_set.h"
 
 namespace base {
 
@@ -143,7 +143,7 @@ class Timer {
 
   std::unique_ptr<TimerFd> timerfd_;
 
-  base::owner_set<Request> requests_;
+  base::unique_set<Request> requests_;
   std::map<TimerDuration, PeriodicRequest*> periodic_;
   std::set<Request*, RequestOrder> queue_;
 
