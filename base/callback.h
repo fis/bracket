@@ -5,6 +5,7 @@
 #ifndef BASE_CALLBACK_H_
 #define BASE_CALLBACK_H_
 
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -65,6 +66,8 @@ class Callback {
 
   template<typename Iface>
   friend class CallbackPtr;
+  template<typename Iface>
+  friend class CallbackQueue;
   template<typename Iface, typename... Datas>
   friend class CallbackSet;
   template<typename Key, typename Iface>
@@ -163,6 +166,86 @@ class CallbackPtr : public internal::CallbackContainer {
 
  private:
   base::optional_ptr<Iface> callback_ = nullptr;
+};
+
+/**
+ * Callback container for a queue of callbacks.
+ *
+ * \tparam Iface callback interface, deriving from Callback.
+ */
+template<typename Iface>
+class CallbackQueue : public internal::CallbackContainer {
+ public:
+  CallbackQueue() = default;
+  DISALLOW_COPY(CallbackQueue);
+
+  ~CallbackQueue() {
+    Clear();
+  }
+
+  /** Adds a callback to the queue. */
+  Iface* Add(base::optional_ptr<Iface> callback) {
+    Iface* ptr = callback.get();
+    callbacks_.emplace(std::move(callback));
+    order_.push_back(ptr);
+    ptr->RegisterContainer(this, ptr);
+    return ptr;
+  }
+
+  /**
+   * Removes the callback from this container.
+   *
+   * If the callback was owned, it's destroyed. Otherwise it's simply unlinked from this
+   * container. If the container was empty, nothing happens.
+   */
+  void Clear() {
+    for (const auto& callback : callbacks_)
+      callback->UnregisterContainer(this);
+    callbacks_.clear();
+    order_.clear();
+  }
+
+  /**
+   * Calls one of the callback interface methods on all the contained callbacks in order, and removes them.
+   *
+   * Given `struct Iface : public virtual Callback { virtual void f(int x) = 0; }`, you can call the
+   * method with `queue.Call(&Iface::f, 123)`.
+   *
+   * \tparam M pointer to a member function type of \p Iface
+   * \tparam Args argument types of the callback method
+   * \param m pointer to a member
+   * \param args arguments forwarded to the called method
+   */
+  template<typename M, typename... Args>
+  void Flush(M m, Args&&... args) {
+    while (!order_.empty()) {
+      Iface* ptr = order_.front();
+      order_.pop_front();
+
+      auto node = callbacks_.extract(base::borrow(ptr));
+      if (!node)
+        continue;  // already removed
+
+      ptr->UnregisterContainer(this);
+      (ptr->*m)(std::forward<Args>(args)...);
+    }
+  }
+
+  /**
+   * Removes a callback from this container.
+   *
+   * Only intended to be called by code in the Callback base class.
+   */
+  void Unregister(Callback* dying_callback, void* data) override {
+    callbacks_.erase(base::borrow(static_cast<Iface*>(data)));
+  }
+
+  /** Returns `true` if no callback has been set. */
+  bool empty() const noexcept { return order_.empty(); }
+
+ private:
+  base::optional_set<Iface> callbacks_;
+  std::deque<Iface*> order_;
 };
 
 /**
