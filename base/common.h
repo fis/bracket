@@ -7,8 +7,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <type_traits>
+#include <unordered_set>
 #include <utility>
 
 /** Deletes the default copy constructor and assignment operators of \p TypeName. */
@@ -165,7 +167,12 @@ class optional_ptr<T, true> {
   }
 };
 
-// free utility functions to help with optional_ptr
+// optional_ptr utilities
+
+template <typename T, bool aligned>
+bool operator==(const optional_ptr<T, aligned>& a, const optional_ptr<T, aligned>& b) { return a.get() == b.get(); }
+template <typename T, bool aligned>
+bool operator!=(const optional_ptr<T, aligned>& a, const optional_ptr<T, aligned>& b) { return a.get() != b.get(); }
 
 template <typename T>
 optional_ptr<T> own(std::unique_ptr<T> ptr) { return optional_ptr<T>(std::move(ptr)); }
@@ -178,7 +185,19 @@ optional_ptr<T> make_owned(Args&&... args) {
   return own(std::make_unique<T>(std::forward<Args>(args)...));
 }
 
+template <typename T>
+using optional_set = std::unordered_set<optional_ptr<T>>;
+
 } // namespace base
+
+// hash specialization for optional_ptr
+
+template <typename T>
+struct std::hash<base::optional_ptr<T>> {
+  std::size_t operator()(const base::optional_ptr<T>& ptr) const noexcept {
+    return std::hash<T*>()(ptr.get());
+  }
+};
 
 #endif // BASE_COMMON_H_
 
