@@ -25,6 +25,16 @@ inline std::uint8_t read_u8(const byte* b) { return b[0]; }
 inline std::int16_t read_i16(const byte* b) { return (std::int16_t) b[0] | (std::int16_t) b[1] << 8; }
 /** Reads an unsigned 16-bit integer from binary data. */
 inline std::int16_t read_u16(const byte* b) { return (std::uint16_t) b[0] | (std::uint16_t) b[1] << 8; }
+/** Reads a signed 24-bit integer from binary data. */
+inline std::int32_t read_i24(const byte* b) {
+  std::int32_t v = (std::int32_t) b[0] | (std::int32_t) b[1] << 8 | (std::int32_t) b[2] << 16;
+  if (v & 0x800000) v |= (std::int32_t) 0xff800000;
+  return v;
+}
+/** Reads an unsigned 24-bit integer from binary data. */
+inline std::uint32_t read_u24(const byte* b) {
+  return (std::uint32_t) b[0] | (std::uint32_t) b[1] << 8 | (std::uint32_t) b[2] << 16;
+}
 /** Reads a signed 32-bit integer from binary data. */
 inline std::int32_t read_i32(const byte* b) {
   return (std::int32_t) b[0] | (std::int32_t) b[1] << 8 | (std::int32_t) b[2] << 16 | (std::int32_t) b[3] << 24;
@@ -42,6 +52,10 @@ inline void write_u8(std::uint8_t v, byte* b) { b[0] = v; }
 inline void write_i16(std::int16_t v, byte* b) { b[0] = v; b[1] = v >> 8; }
 /** Writes an unsigned 16-bit integer into binary data. */
 inline void write_u16(std::uint16_t v, byte* b) { b[0] = v; b[1] = v >> 8; }
+/** Writes a signed 24-bit integer into binary data. */
+inline void write_i24(std::int32_t v, byte* b) { b[0] = v; b[1] = v >> 8; b[2] = v >> 16; }
+/** Writes an unsigned 24-bit integer into binary data. */
+inline void write_u24(std::uint32_t v, byte* b) { b[0] = v; b[1] = v >> 8; b[2] = v >> 16; }
 /** Writes a signed 32-bit integer into binary data. */
 inline void write_i32(std::int32_t v, byte* b) {
   b[0] = v; b[1] = v >> 8; b[2] = v >> 16; b[3] = v >> 24;
