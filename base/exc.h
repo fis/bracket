@@ -24,6 +24,11 @@ struct error {
   /** Appends the formatted error message to stream \p str. */
   virtual void format(std::ostream* str) const = 0;
   virtual ~error() = default;
+
+  /** Returns the error message as a string. */
+  std::string to_string() {
+    std::string str; format(&str); return str;
+  }
 };
 
 /** Type alias for smart pointers to error objects. */
@@ -36,6 +41,14 @@ inline std::ostream& operator<<(std::ostream& os, const error& err) { err.format
 error_ptr make_error(const char* what);
 /** Constructs a new simple error object with a copy of a string object. */
 error_ptr make_error(const std::string& what);
+/** Constructs a new simple error object with a moved string object. */
+error_ptr make_error(std::string&& what);
+/** Constructs a new simple error object with the text of another error. */
+error_ptr make_error(const error& err, const char* prefix = nullptr);
+/** \overload */
+error_ptr make_error(const error& err, const std::string& prefix);
+/** \overload */
+error_ptr make_error(const error& err, std::string&& prefix);
 
 /**
  * Error object type for system errors, optionally with errno.
@@ -111,8 +124,11 @@ class maybe_ptr {
   /** Element type this pointer (possibly) points at. */
   using element_type = T;
 
+  /** Null constructor. */
+  maybe_ptr(std::nullptr_t = nullptr) : value_(std::in_place_index<1>, nullptr) {}
+
   /** Move constructor. */
-  maybe_ptr(maybe_ptr&& other) : value_(std::move(other.value_)) {}
+  maybe_ptr(maybe_ptr&& other) : value_(std::move(other.value_)) {}  // TODO: set other.value_ to null error?
 
   /** Converting move constructor. */
   template <typename U>
@@ -122,6 +138,17 @@ class maybe_ptr {
       value_ = std::variant<std::unique_ptr<T>, error_ptr>(std::in_place_index<0>, std::move(std::get<0>(other.value_)));
     else
       value_ = std::variant<std::unique_ptr<T>, error_ptr>(std::in_place_index<1>, std::move(std::get<1>(other.value_)));
+  }
+
+  /** Move assignment operator. */
+  maybe_ptr& operator=(maybe_ptr&& other) {
+    value_ = std::move(other.value_); return *this;
+  }
+
+  /** Converting move assignment operator. */
+  template <typename U>
+  maybe_ptr& operator=(maybe_ptr<U>&& other) {
+    *this = maybe_ptr<T>(other); return *this;
   }
 
   DISALLOW_COPY(maybe_ptr);
@@ -148,7 +175,7 @@ class maybe_ptr {
   maybe_ptr(error_tag, error_ptr error) : value_(std::in_place_index<1>, std::move(error)) {}
 };
 
-/** Converts a regular `std::unique_ptr<T>` to a `maybe_ptr<T>`. */
+/** Converts a regular `std::unique_ptr<U>` to a `maybe_ptr<T>`. */
 template <typename T, typename U>
 inline maybe_ptr<T> maybe_ok_from(std::unique_ptr<U> ptr) {
   return maybe_ptr<T>(typename maybe_ptr<T>::ok_tag(), std::move(ptr));

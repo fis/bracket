@@ -18,6 +18,7 @@ class cstr_error : public error {
 class string_error : public error {
  public:
   string_error(const std::string& what) : what_(what) {}
+  string_error(std::string&& what) : what_(what) {}
   void format(std::string* str) const override;
   void format(std::ostream* str) const override;
  private:
@@ -37,6 +38,31 @@ error_ptr make_error(const char* what) {
 
 error_ptr make_error(const std::string& what) {
   return std::make_unique<internal::string_error>(what);
+}
+
+error_ptr make_error(std::string&& what) {
+  return std::make_unique<internal::string_error>(std::move(what));
+}
+
+error_ptr make_error(const error& err, const char* prefix) {
+  std::string text;
+  if (prefix) { text = prefix; text += ": "; }
+  err.format(&text);
+  return std::make_unique<internal::string_error>(std::move(text));
+}
+
+error_ptr make_error(const error& err, const std::string& prefix) {
+  std::string text{prefix};
+  text += ": ";
+  err.format(&text);
+  return std::make_unique<internal::string_error>(std::move(text));
+}
+
+error_ptr make_error(const error& err, std::string&& prefix) {
+  std::string text{std::move(prefix)};
+  text += ": ";
+  err.format(&text);
+  return std::make_unique<internal::string_error>(std::move(text));
 }
 
 void os_error::format(std::string* str) const {
