@@ -1,6 +1,14 @@
+#include <cerrno>
 #include <cstring>
 
 #include "base/buffer.h"
+
+extern "C" {
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+}
 
 namespace base {
 
@@ -108,5 +116,144 @@ void ring_buffer::normalize() {
   first_byte_ = 0;
 }
 #endif
+
+byte_file::~byte_file() {
+  if (fd_ != -1)
+    close(fd_);
+}
+
+error_ptr byte_file::open(const char* file, open_mode mode, create_mode create) {
+  int flags = 0;
+
+  switch (mode) {
+    case kRead: flags |= O_RDONLY; break;
+    case kWrite: flags |= O_WRONLY; break;
+    case kReadWrite: flags |= O_RDWR; break;
+  }
+
+  switch (create) {
+    case kExist: break;
+    case kCreate: flags |= O_TRUNC | O_CREAT; break;
+    case kExclusive: flags |= O_TRUNC | O_CREAT | O_EXCL; break;
+  }
+
+  fd_ = ::open(file, flags, 0600);
+  if (fd_ == -1)
+    return base::make_os_error("open", errno);
+  return nullptr;
+}
+
+io_result byte_file::read(std::size_t size, byte* dst) {
+  std::size_t read = 0;
+  while (size > 0) {
+    ssize_t got = ::read(fd_, dst, size);
+    if (got == -1)
+      return io_result::os_error("read", errno);
+    if (got == 0)
+      break;
+    size -= got;
+    dst += got;
+    read += got;
+  }
+  return read == 0 ? io_result::eof() : io_result::ok(read);
+}
+
+io_result byte_file::read_n(std::size_t size, byte* dst) {
+  io_result ret = read(size, dst);
+  if (ret.at_eof() || (ret.ok() && ret.size() < size))
+    return io_result::os_error("read: truncated");
+  else
+    return ret;
+}
+
+io_result byte_file::read_at(std::size_t offset, std::size_t size, byte* dst) const {
+  std::size_t read = 0;
+  while (size > 0) {
+    ssize_t got = pread(fd_, dst, size, offset);
+    if (got == -1)
+      return io_result::os_error("pread", errno);
+    if (got == 0)
+      break;
+    offset += got;
+    size -= got;
+    dst += got;
+    read += got;
+  }
+  return read == 0 ? io_result::eof() : io_result::ok(read);
+}
+
+io_result byte_file::read_n_at(std::size_t offset, std::size_t size, byte* dst) const {
+  io_result ret = read_at(offset, size, dst);
+  if (ret.at_eof() || (ret.ok() && ret.size() < size))
+    return io_result::os_error("pread: truncated");
+  else
+    return ret;
+}
+
+io_result byte_file::write(std::size_t size, const byte* src) {
+  ssize_t wrote = ::write(fd_, src, size);
+  if (wrote == -1)
+    return io_result::os_error("write", errno);
+  return io_result::ok(wrote);
+}
+
+io_result byte_file::write_n(std::size_t size, const byte* src) {
+  std::size_t left = size;
+  while (left > 0) {
+    ssize_t put = ::write(fd_, src, left);
+    if (put == -1)
+      return io_result::os_error("write", errno);
+    left -= put;
+    src += put;
+  }
+  return io_result::ok(size);
+}
+
+io_result byte_file::write_at(std::size_t offset, std::size_t size, const byte* src) {
+  ssize_t wrote = pwrite(fd_, src, size, offset);
+  if (wrote == -1)
+    return io_result::os_error("pwrite", errno);
+  return io_result::ok(wrote);
+}
+
+io_result byte_file::write_n_at(std::size_t offset, std::size_t size, const byte* src) {
+  std::size_t left = size;
+  while (left > 0) {
+    ssize_t put = pwrite(fd_, src, left, offset);
+    if (put == -1)
+      return io_result::os_error("pwrite", errno);
+    offset += put;
+    left -= put;
+    src += put;
+  }
+  return io_result::ok(size);
+}
+
+io_result byte_file::read_all(byte_buffer* dst, std::size_t chunk_size) {
+  std::size_t total_read = 0;
+
+  std::size_t prev_size;
+  while (true) {
+    prev_size = dst->size();
+    dst->resize(prev_size + chunk_size);
+
+    auto ret = read(chunk_size, dst->data() + prev_size);
+    if (ret.failed())
+      return io_result::error(ret.error());
+    if (ret.at_eof())
+      break;
+
+    std::size_t read_size = ret.size();
+    if (read_size < chunk_size)
+      dst->resize(prev_size + read_size);
+    total_read += read_size;
+  }
+  dst->resize(prev_size);  // undo needed extra space
+
+  if (total_read > 0)
+    return io_result::ok(total_read);
+  else
+    return io_result::eof();
+}
 
 } // namespace base

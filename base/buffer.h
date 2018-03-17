@@ -1,5 +1,5 @@
 /** \file
- * Byte buffers and ring buffers.
+ * Utilities for dealing with raw binary data.
  */
 
 #ifndef BASE_BUFFER_H_
@@ -353,6 +353,78 @@ class ring_buffer {
 
   /** Resizes the backing storage. \p new_size must be a power of two and >= \p used_. */
   void resize(std::size_t new_size);
+};
+
+/** Utility class for dealing with binary files. */
+class byte_file {
+ public:
+  /** Read/write mode for opening a file. */
+  enum open_mode {
+    /** Open the file for reading only. */
+    kRead,
+    /** Open the file for writing only. */
+    kWrite,
+    /** Open the file for reading or writing. */
+    kReadWrite,
+  };
+  /** How to deal with existing files. */
+  enum create_mode {
+    /** Only open existing files. */
+    kExist,
+    /** Create a new file if necessary; if a file exists, truncate it. */
+    kCreate,
+    /** Always create a new file; fail if the file already exists. */
+    kExclusive,
+  };
+
+  /** Constructs an object which represents no file yet. */
+  byte_file() noexcept = default;
+
+  DISALLOW_COPY(byte_file);
+
+  /** Move constructor. */
+  byte_file(byte_file&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+  /** Move assignment operator. */
+  byte_file& operator=(byte_file&& other) noexcept { fd_ = other.fd_; other.fd_ = -1; return *this; }
+
+  /** Destroys the object, releasing the open file. */
+  ~byte_file();
+
+  /** Returns `true` if the object represents an open file. */
+  bool valid() const noexcept { return fd_ != -1; }
+
+  /** Tries to open the specified file. */
+  error_ptr open(const char* file, open_mode mode, create_mode create = kExist);
+  /** \overload */
+  error_ptr open(const std::string& file, open_mode mode, create_mode create = kExist) {
+    return open(file.c_str(), mode, create);
+  }
+
+  /** Reads up to \p size bytes to memory pointed by \p dst. */
+  io_result read(std::size_t size, byte* dst);
+  /** Reads exactly \p size bytes to memory pointed by \p dst. */
+  io_result read_n(std::size_t size, byte* dst);
+  /** Reads up to \p size bytes from file offset \p offset into \p dst. */
+  io_result read_at(std::size_t offset, std::size_t size, byte* dst) const;
+  /** Reads exactly \p size bytes from file offset \p offset into \p dst. */
+  io_result read_n_at(std::size_t offset, std::size_t size, byte* dst) const;
+
+  /** Writes up to \p size bytes from memory pointed by \p src. */
+  io_result write(std::size_t size, const byte* src);
+  /** Writes exactly \p size bytes from memory pointed by \p src. */
+  io_result write_n(std::size_t size, const byte* src);
+  /** Writes up to \p size bytes to file offset \p offset from \p src. */
+  io_result write_at(std::size_t offset, std::size_t size, const byte* src);
+  /** Writes exactly \p size bytes to file offset \p offset from \p src. */
+  io_result write_n_at(std::size_t offset, std::size_t size, const byte* src);
+
+  /** Reads the entire contents of the file to \p dst. */
+  io_result read_all(byte_buffer* dst, std::size_t chunk_size = 8192);
+  /** Writes the contents of \p src to the file. */
+  io_result write_all(const byte_buffer& src) { return write_n(src.size(), src.data()); }
+
+ private:
+  int fd_ = -1;
 };
 
 } // namespace base
