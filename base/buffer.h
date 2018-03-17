@@ -73,12 +73,16 @@ using byte_array = std::array<byte, N>;
 using byte_buffer = std::vector<byte>;
 
 /** View into an existing buffer. Holds a pointer and a size. */
-class byte_view {
+template <typename B>
+class byte_view_base {
  public:
   /** Makes a new, invalid view. */
-  byte_view() : data_(nullptr), size_(0) {}
+  byte_view_base() : data_(nullptr), size_(0) {}
   /** Makes a new view from the provided parameters. */
-  byte_view(byte* d, std::size_t s) : data_(d), size_(s) {}
+  byte_view_base(B* d, std::size_t s) : data_(d), size_(s) {}
+  /** Makes a new view from a byte_array or a byte_buffer. */
+  template <typename Container>
+  explicit byte_view_base(Container& d) : data_(&d[0]), size_(d.size()) {}
 
   /** Returns `true` if the view is pointing at valid data. */
   bool valid() const noexcept { return data_ != nullptr; }
@@ -86,38 +90,60 @@ class byte_view {
   explicit operator bool() const noexcept { return valid(); }
 
   /** Returns the data pointer this view points at, or `nullptr` if not valid. */
-  byte* data() noexcept { return data_; }
+  B* data() noexcept { return data_; }
   /** \overload */
-  const byte* data() const noexcept { return data_; }
+  const B* data() const noexcept { return data_; }
 
   /** Returns the size of the view in bytes. */
   std::size_t size() const noexcept { return size_; }
+  /** Returns `true` if size() is zero. */
+  bool empty() const noexcept { return size_ == 0; }
 
   /** Accesses the specified byte of the view. */
-  byte& operator[](std::size_t i) noexcept { return data_[i]; }
+  B& operator[](std::size_t i) noexcept { return data_[i]; }
   /** \overload */
-  const byte& operator[](std::size_t i) const noexcept { return data_[i]; }
+  const B& operator[](std::size_t i) const noexcept { return data_[i]; }
 
   /** Returns a pointer to the beginning of the view. */
-  byte* begin() noexcept { return data_; }
+  B* begin() noexcept { return data_; }
   /** \overload */
-  const byte* begin() const noexcept { return data_; }
+  const B* begin() const noexcept { return data_; }
   /** Returns a const pointer to the beginning of the view. */
-  const byte* cbegin() const noexcept { return data_; }
+  const B* cbegin() const noexcept { return data_; }
 
   /** Returns a pointer to one past the last byte of the view. */
-  byte* end() noexcept { return data_ + size_; }
+  B* end() noexcept { return data_ + size_; }
   /** \overload */
-  const byte* end() const noexcept { return data_ + size_; }
+  const B* end() const noexcept { return data_ + size_; }
   /** Returns a const pointer to one past the last byte of the view. */
-  const byte* cend() const noexcept { return data_ + size_; }
+  const B* cend() const noexcept { return data_ + size_; }
+
+  /** Returns a new view to the first \p n bytes of this view. */
+  byte_view_base<B> front(std::size_t n) { return byte_view_base<B>(data_, n); }
+  /** Returns a new view to the last \p n bytes of this view. */
+  byte_view_base<B> back(std::size_t n) { return byte_view_base<B>(data_ + size_ - n, n); }
+
+  /** Modifies this view to no longer include the first \p n bytes. */
+  void pop_front(std::size_t n) { data_ += n; size_ -= n; }
+  /** Modifies this view to no longer include the last \p n bytes. */
+  void pop_back(std::size_t n) { size_ -= n; }
+
+  /** Modifies this view to only include the first \p n bytes. */
+  void keep_front(std::size_t n) { size_ = n; }
+  /** Modifies this view to only include the last \p n bytes. */
+  void keep_back(std::size_t n) { data_ += size_ - n; size_ = n; }
 
  private:
   /** Pointer to the data of the view. */
-  byte* data_;
+  B* data_;
   /** Size of the pointed-to data. */
   std::size_t size_;
 };
+
+/** Instance of byte_view_base over mutable bytes. */
+using byte_view = byte_view_base<byte>;
+/** Instance of byte_view_base over immutable bytes. */
+using const_byte_view = byte_view_base<const byte>;
 
 /**
  * Automatically resizable ring buffer, for FIFO queues of bytes.
