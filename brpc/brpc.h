@@ -68,7 +68,7 @@ class RpcCall : public event::Socket::Watcher, public event::Finishable {
   ~RpcCall();
 
   void Send(const google::protobuf::Message& message);
-  void Close(base::error_ptr error = nullptr); // TODO: fix flushing outgoing messages on close
+  void Close(base::error_ptr error = nullptr, bool flush = true);
 
   void ConnectionOpen() override;
   void ConnectionFailed(base::error_ptr error) override;
@@ -79,7 +79,13 @@ class RpcCall : public event::Socket::Watcher, public event::Finishable {
   event::Loop* loop_;
   std::variant<RpcServer*, RpcClient*> host_;
 
-  enum class State { kConnecting, kDispatching, kReady, kClosed };
+  enum class State {
+    kConnecting,  ///< client-side call, waiting for socket to report open connection
+    kDispatching, ///< server-side call, reading method number
+    kReady,       ///< call in progress, read/write okay
+    kFlushing,    ///< non-error close requested, flushing output buffer
+    kClosed,      ///< socket released, object will be destroyed soon
+  };
   State state_;
 
   std::unique_ptr<event::Socket> socket_;

@@ -78,14 +78,24 @@ void RpcCall::Send(const google::protobuf::Message& message) {
   Flush();
 }
 
-void RpcCall::Close(base::error_ptr error) {
+void RpcCall::Close(base::error_ptr error, bool flush) {
   if (state_ == State::kClosed)
     return;
-  state_ = State::kClosed;
 
-  write_buffer_.clear();  // TODO: finish flushing output queue on non-error close
+  if (error) {
+    close_error_ = std::move(error);
+    flush = false;
+  }
+
   read_buffer_.clear();
+  if (state_ != State::kFlushing && flush && !write_buffer_.empty()) {
+    state_ = State::kFlushing;
+    socket_->WantRead(false);
+    return;
+  }
+  write_buffer_.clear();
 
+  state_ = State::kClosed;
   if (socket_)
     socket_.reset();
 
@@ -189,11 +199,12 @@ void RpcCall::CanRead() {
     }
   }
 
-  if (eof)
-    Close(
-        state_ == State::kReady && read_buffer_.empty() && !message_size_.has_value()
-        ? nullptr /* regular termination */
-        : base::make_error("RpcCall: unexpected EOF"));
+  if (eof) {
+    if (state_ == State::kReady && read_buffer_.empty() && !message_size_.has_value())
+      Close(/* error: */ nullptr, /* flush: */ false);
+    else
+      Close(base::make_error("RpcCall: unexpected EOF"));
+  }
 }
 
 void RpcCall::CanWrite() {
@@ -201,32 +212,27 @@ void RpcCall::CanWrite() {
 }
 
 void RpcCall::Flush() {
-  if (state_ != State::kReady)
+  if (state_ != State::kReady && state_ != State::kFlushing)
     return;
 
-  if (write_buffer_.empty()) {
-    socket_->WantWrite(false);
-    return;
-  }
-
-  if (!socket_->safe_to_write()) {
-    socket_->WantWrite(true);
-    return;
-  }
-
-  while (!write_buffer_.empty()) {
-    base::byte_view chunk = write_buffer_.next();
-    base::io_result wrote = socket_->Write(chunk.data(), chunk.size());
-    if (!wrote.ok()) {
-      Close(wrote.error());
-      return;
+  if (socket_->safe_to_write()) {
+    while (!write_buffer_.empty()) {
+      base::byte_view chunk = write_buffer_.next();
+      base::io_result wrote = socket_->Write(chunk.data(), chunk.size());
+      if (!wrote.ok()) {
+        Close(wrote.error());
+        return;
+      }
+      if (wrote.size() == 0)
+        break;
+      write_buffer_.pop(wrote.size());
     }
-    if (wrote.size() == 0)
-      break;
-    write_buffer_.pop(wrote.size());
   }
 
   socket_->WantWrite(!write_buffer_.empty());
+
+  if (state_ == State::kFlushing && write_buffer_.empty())
+    Close(/* error: */ nullptr, /* flush: */ false);
 }
 
 void RpcCall::LoopFinished() {
