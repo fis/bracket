@@ -32,21 +32,26 @@ std::ostream& operator<<(std::ostream& os, const Config::Server& server) {
 // Connection implementation.
 // ==========================
 
-constexpr int kAutojoinDelayMs = 10000;
+constexpr auto kAutoJoinDelay = std::chrono::seconds(30);
+constexpr auto kNickRegainDelay = std::chrono::seconds(120);
 
 // TODO sort methods?
 
 Connection::Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry)
     : loop_(loop)
 {
-  // TODO: defaults from a thing
-  config_.set_nick("feworitg");
-  config_.set_user("feworitg");
-  config_.set_realname("feworitg");
+  // configuration defaults
+  config_.set_user("bracket");
+  config_.set_realname("bracket");
   config_.set_resolve_timeout_ms(30000);
   config_.set_connect_timeout_ms(60000);
   config_.set_reconnect_delay_ms(30000);
   config_.MergeFrom(config);
+
+  if (config_.nick().empty())
+    throw base::Exception("IRC nickname not configured");
+  for (auto channel : config_.channels())
+    channels_[channel] = ChannelState::kKnown;
 
   if (metric_registry) {
     metric_connection_up_ = &prometheus::BuildGauge()
@@ -143,8 +148,10 @@ void Connection::ConnectionOpen() {
   Send({ "NICK", config_.nick().c_str() });
   Send({ "USER", config_.user().c_str(), "0", "*", config_.realname().c_str() });
 
-  autojoin_timer_ = loop_->Delay(std::chrono::milliseconds(kAutojoinDelayMs), base::borrow(&autojoin_timer_callback_));
-  // TODO: trigger autojoin prematurely on suitable numeric from server
+  nick_ = config_.nick();
+  alt_nick_ = 0;
+
+  auto_join_timer_ = loop_->Delay(kAutoJoinDelay, base::borrow(&auto_join_timer_callback_));
 
   socket_->WantRead(true);
 
@@ -222,10 +229,45 @@ void Connection::CanRead() {
 }
 
 void Connection::HandleMessage(const Message& message) {
-  if (message.command() == "PING")
-    Send({ "PONG", message.nargs() == 1 ? message.arg(0).c_str() : config_.nick().c_str() });
+  // standard actions
 
-  readers_.Call(&Reader::MessageReceived, read_message_);
+  if (message.command_is("001")) {
+    // RPL_WELCOME -- successful registration
+    Registered();
+  } if (message.command_is("376")) {
+    // RPL_ENDOFMOTD -- trigger autojoin (if not done yet)
+    if (auto_join_timer_ != event::kNoTimer) {
+      loop_->CancelTimer(auto_join_timer_);
+      AutoJoinTimer();
+    }
+  } else if (message.command_is("433") || message.command_is("437")) {
+    // ERR_NICKNAMEINUSE | ERR_UNAVAILRESOURCE -- try alt nick if registering, or restart nick regain timer
+    if (!registered_) {
+      nick_ = config_.nick() + std::to_string(++alt_nick_);
+      Send({ "NICK", nick_.c_str() });
+    } else if (nick_regain_timer_ == event::kNoTimer) {
+      nick_regain_timer_ = loop_->Delay(kNickRegainDelay, base::borrow(&nick_regain_timer_callback_));
+    }
+  } else if (message.command_is("JOIN")) {
+    if (message.prefix_nick_is(nick_) && message.nargs() >= 1) {
+      auto record = channels_.find(message.arg(0));
+      if (record != channels_.end()) {
+        record->second = ChannelState::kJoined;
+        readers_.Call(&Reader::ChannelJoined, record->first);
+      }
+    }
+  } else if (message.command_is("NICK")) {
+    if (message.prefix_nick_is(nick_) && message.nargs() >= 1) {
+      nick_ = message.arg(0);
+      readers_.Call(&Reader::NickChanged, nick_);
+    }
+  } else if (message.command_is("PING")) {
+    Send({ "PONG", message.nargs() == 1 ? message.arg(0).c_str() : config_.nick().c_str() });
+  }
+
+  // pass to client
+
+  readers_.Call(&Reader::RawReceived, read_message_);
 }
 
 namespace {
@@ -398,34 +440,48 @@ void Connection::WriteCreditTimer() {
 
 void Connection::ConnectionLost(base::error_ptr error) {
   const Config::Server& server = config_.servers(current_server_);
-
-  socket_.reset();
-
-  write_buffer_.clear();
-  write_queue_.clear();
-
-  if (write_credit_timer_) {
-    loop_->CancelTimer(write_credit_timer_);
-    write_credit_timer_ = event::kNoTimer;
-  }
-
-  if (autojoin_timer_) {
-    loop_->CancelTimer(autojoin_timer_);
-    autojoin_timer_ = event::kNoTimer;
-  }
-
-  int reconnect_delay_ms = config_.reconnect_delay_ms();
+  const int reconnect_delay_ms = config_.reconnect_delay_ms();
 
   LOG(WARNING)
       << "connection to " << server << " lost (" << *error
       << ") - trying next server in " << reconnect_delay_ms << " ms";
 
+  socket_.reset();
+  if (metric_connection_up_)
+    metric_connection_up_->Set(0);
+
+  write_buffer_.clear();
+  write_queue_.clear();
+
+  if (write_credit_timer_ != event::kNoTimer) {
+    loop_->CancelTimer(write_credit_timer_);
+    write_credit_timer_ = event::kNoTimer;
+  }
+
+  if (auto_join_timer_ != event::kNoTimer) {
+    loop_->CancelTimer(auto_join_timer_);
+    auto_join_timer_ = event::kNoTimer;
+  }
+
+  if (nick_regain_timer_ != event::kNoTimer) {
+    loop_->CancelTimer(nick_regain_timer_);
+    nick_regain_timer_ = event::kNoTimer;
+  }
+
+  for (auto& entry : channels_) {
+    if (entry.second == ChannelState::kJoined)
+      readers_.Call(&Reader::ChannelLeft, entry.first);
+    entry.second = ChannelState::kKnown;
+  }
+  if (registered_)
+    readers_.Call(&Reader::ConnectionLost, config_.servers(current_server_));
+
+  registered_ = false;
+  nick_.clear();
+
   current_server_ = (current_server_ + 1) % config_.servers_size();
 
   reconnect_timer_ = loop_->Delay(std::chrono::milliseconds(reconnect_delay_ms), base::borrow(&reconnect_timer_callback_));
-
-  if (metric_connection_up_)
-    metric_connection_up_->Set(0);
 }
 
 void Connection::ReconnectTimer() {
@@ -433,9 +489,35 @@ void Connection::ReconnectTimer() {
   Start();
 }
 
-void Connection::AutojoinTimer() {
-  for (auto&& channel : config_.channels())
-    Send({ "JOIN", channel.c_str() });
+void Connection::Registered() {
+  registered_ = true;
+  readers_.Call(&Reader::NickChanged, nick_);
+
+  if (nick_ != config_.nick() && nick_regain_timer_ == event::kNoTimer)
+    nick_regain_timer_ = loop_->Delay(kNickRegainDelay, base::borrow(&nick_regain_timer_callback_));
+}
+
+void Connection::AutoJoinTimer() {
+  auto_join_timer_ = event::kNoTimer;
+
+  if (!registered_)
+    Registered();  // just assume it's okay
+
+  for (auto& entry : channels_) {
+    if (entry.second == ChannelState::kKnown) {
+      entry.second = ChannelState::kJoining;
+      Send({ "JOIN", entry.first.c_str() });
+    }
+  }
+
+  readers_.Call(&Reader::ConnectionReady, config_.servers(current_server_));
+}
+
+void Connection::NickRegainTimer() {
+  nick_regain_timer_ = event::kNoTimer;
+  if (nick_ == config_.nick())
+    return;  // already okay
+  Send({ "NICK", config_.nick().c_str() });
 }
 
 } // namespace irc

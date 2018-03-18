@@ -30,7 +30,7 @@ bool Message::Parse(const unsigned char* data, std::size_t count) {
   auto* p = reinterpret_cast<const char*>(data);
   std::size_t left = count;
 
-  // parse prefix
+  // parse prefix & extract nick portion
 
   prefix_.clear();
   if (left > 0 && *p == ':') {
@@ -43,6 +43,15 @@ bool Message::Parse(const unsigned char* data, std::size_t count) {
 
     std::size_t prefix_len = d - p;
     prefix_.append(p, prefix_len);
+
+    auto* n = static_cast<const char*>(std::memchr(p, '!', prefix_len));
+    if (n) {
+      std::size_t nick_len = n - p;
+      prefix_nick_ = std::string_view{prefix_.data(), nick_len};
+    } else {
+      prefix_nick_ = std::string_view{};
+    }
+
     p += prefix_len;
     left -= prefix_len;
   }
@@ -139,31 +148,13 @@ std::size_t Message::Write(unsigned char* buffer, std::size_t size) const {
   return at;
 }
 
-std::string_view Message::prefix_nick() const {
-  // TODO: precompute these when parsing, just return direct views
-
-  const char* prefix = prefix_.data();
-  std::size_t len = prefix_.size();
-
-  const char* ex = static_cast<const char*>(memchr(prefix, '!', len));
-  if (!ex)
-    return std::string_view();
-  const char* at = static_cast<const char*>(memchr(ex + 1, '@', len - (ex - prefix) - 1));
-  if (!at)
-    return std::string_view();
-
-  if (ex == prefix || at == ex + 1 || at == prefix + len - 1)
-    return std::string_view();
-
-  return std::string_view(prefix, ex - prefix);
-}
-
-bool Message::EqualArg(const char* a, const char* b) {
-  for (; *a && *b; ++a, ++b) {
-    if (std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b))
+bool Message::EqualArg(std::string_view a, std::string_view b) {
+  if (a.size() != b.size())
+    return false;
+  for (std::size_t i = 0, len = a.size(); i < len; ++i)
+    if (std::tolower((unsigned char)a[i]) != std::tolower((unsigned char)b[i]))
       return false;
-  }
-  return !*a && !*b;
+  return true;
 }
 
 } // namespace irc

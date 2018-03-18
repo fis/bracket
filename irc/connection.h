@@ -8,6 +8,7 @@
 #include <array>
 #include <memory>
 #include <queue>
+#include <unordered_set>
 
 #include <prometheus/registry.h>
 
@@ -68,8 +69,19 @@ class Connection : public event::Socket::Watcher {
  public:
   /** Callback interface for incoming messages on the connection. */
   struct Reader : public virtual base::Callback {
-    /** Called when a new IRC message has been received. */
-    virtual void MessageReceived(const Message& message) = 0;
+    /** Called when any new IRC message has been received. */
+    virtual void RawReceived(const Message& message) {}
+    // TODO: RawSent, RawQueued?
+    /** Called when the connection to a new server is ready for use. */
+    virtual void ConnectionReady(const Config::Server& server) {}
+    /** Called when the connection to a current server is lost. */
+    virtual void ConnectionLost(const Config::Server& server) {}
+    /** Called when the nickname has been registered or changed. */
+    virtual void NickChanged(const std::string& nick) {}
+    /** Called when we have successfully joined a channel. */
+    virtual void ChannelJoined(const std::string& channel) {}
+    /** Called when we have left a channel (for any reason, including lost connection). */
+    virtual void ChannelLeft(const std::string& channel) {}
   };
 
   /**
@@ -183,8 +195,28 @@ class Connection : public event::Socket::Watcher {
   /** If we're waiting for enough credits to send, id of the timer. */
   event::TimerId write_credit_timer_ = event::kNoTimer;
 
-  /** Autojoin timer, active right after a connection has been established. */
-  event::TimerId autojoin_timer_ = event::kNoTimer;
+  /** `true` once the registration (nick/user/pass) commands have been accepted. */
+  bool registered_ = false;
+  /** Currently active nickname. May not match config_.nick() if unavailable. */
+  std::string nick_;
+  /** If nonzero, #nick_ is not the configured nick. The number is used as a suffix. */
+  int alt_nick_ = 0;
+  /** If we're waiting to reclaim the configured nickname, id of the timer. */
+  event::TimerId nick_regain_timer_ = event::kNoTimer;
+
+  /** Possible states configured channels can be in. */
+  enum class ChannelState {
+    /** Registered in configuration, but not joined or attempting to join yet. */
+    kKnown,
+    /** Join command sent (or in send queue), waiting for response. */
+    kJoining,
+    /** Currently on the channel. */
+    kJoined,
+  };
+  /** States configured channels are in. */
+  std::unordered_map<std::string, ChannelState> channels_;
+  /** If we're waiting to auto-join channels, id of the timer. */
+  event::TimerId auto_join_timer_ = event::kNoTimer;
 
   /** Called when the server socket has connected. */
   void ConnectionOpen() override;
@@ -208,12 +240,17 @@ class Connection : public event::Socket::Watcher {
   /** Called when it's time to try automatically reconnecting. */
   void ReconnectTimer();
 
-  /** Callback to attempt to join channels that need to be automatically joined. */
-  void AutojoinTimer();
+  /** Called when nick registration is successful. */
+  void Registered();
+  /** Callback to do actions (like autojoin) after connecting to a new server. */
+  void AutoJoinTimer();
+  /** Callback to attempt to regain the configured nickname. */
+  void NickRegainTimer();
 
   event::TimedM<Connection, &Connection::WriteCreditTimer> write_credit_timer_callback_{this};
   event::TimedM<Connection, &Connection::ReconnectTimer> reconnect_timer_callback_{this};
-  event::TimedM<Connection, &Connection::AutojoinTimer> autojoin_timer_callback_{this};
+  event::TimedM<Connection, &Connection::AutoJoinTimer> auto_join_timer_callback_{this};
+  event::TimedM<Connection, &Connection::NickRegainTimer> nick_regain_timer_callback_{this};
 };
 
 } // namespace irc

@@ -88,20 +88,29 @@ class Message {
   /** Returns the contents of the argument \p at. */
   const std::string& arg(int at) const { return args_.at(at); }
 
-  /** Returns the nick portion of the prefix, if it's in the `nick!user@host` form. */
-  std::string_view prefix_nick() const;
+  /** Returns the nick portion of the prefix, if it's in the `nick!user@host` form. Empty otherwise. */
+  std::string_view prefix_nick() const { return prefix_nick_; }
 
   /** Returns true if the command field matches (ASCII-case-insensitive) \p test. */
-  bool command_is(const char* test) const { return EqualArg(command_.data(), test); }
+  bool command_is(const std::string& test) const { return EqualArg(command_, test); }
+  /** \overload */
+  bool command_is(const char* test) const { return EqualArg(command_, test); }
   /** Returns true if argument \p n exists and matches (ASCII-case-insensitive) \p test. */
-  bool arg_is(unsigned n, const char* test) const { return n < args_.size() && EqualArg(args_[n].data(), test); }
+  bool arg_is(unsigned n, const std::string& test) const { return n < args_.size() && EqualArg(args_[n], test); }
+  /** \overload */
+  bool arg_is(unsigned n, const char* test) const { return n < args_.size() && EqualArg(args_[n], test); }
+  /** Returns true if the message has a nick prefix and matches \p test. */
+  bool prefix_nick_is(const std::string& test) const { return EqualArg(prefix_nick_, test); }
+  /** \overload */
+  bool prefix_nick_is(const char* test) const { return EqualArg(prefix_nick_, test); }
 
  private:
   std::string prefix_;
+  std::string_view prefix_nick_;
   std::string command_;
   std::vector<std::string> args_;
 
-  static bool EqualArg(const char* a, const char* b);
+  static bool EqualArg(std::string_view a, std::string_view b);
 };
 
 } // namespace irc

@@ -12,6 +12,7 @@ TEST(MessageTest, ParseCommand) {
   bool ok = m.Parse("quit");
   ASSERT_TRUE(ok);
   EXPECT_TRUE(m.prefix().empty());
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "quit");
   EXPECT_EQ(m.nargs(), 0);
 }
@@ -21,6 +22,7 @@ TEST(MessageTest, ParseCommandAndArgs) {
   bool ok = m.Parse("whois foo bar");
   ASSERT_TRUE(ok);
   EXPECT_TRUE(m.prefix().empty());
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "whois");
   EXPECT_EQ(m.nargs(), 2);
   EXPECT_EQ(m.arg(0), "foo");
@@ -32,6 +34,7 @@ TEST(MessageTest, ParseCommandAndTrailing) {
   bool ok = m.Parse("quit :some message here");
   ASSERT_TRUE(ok);
   EXPECT_TRUE(m.prefix().empty());
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "quit");
   EXPECT_EQ(m.nargs(), 1);
   EXPECT_EQ(m.arg(0), "some message here");
@@ -42,6 +45,7 @@ TEST(MessageTest, ParseCommandAndArgsAndTrailing) {
   bool ok = m.Parse("whois foo bar :extra stuff");
   ASSERT_TRUE(ok);
   EXPECT_TRUE(m.prefix().empty());
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "whois");
   EXPECT_EQ(m.nargs(), 3);
   EXPECT_EQ(m.arg(0), "foo");
@@ -54,6 +58,7 @@ TEST(MessageTest, ParsePrefixedCommand) {
   bool ok = m.Parse(":irc.server quit");
   ASSERT_TRUE(ok);
   EXPECT_EQ(m.prefix(), "irc.server");
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "quit");
   EXPECT_EQ(m.nargs(), 0);
 }
@@ -63,6 +68,7 @@ TEST(MessageTest, ParsePrefixedCommandAndTrailing) {
   bool ok = m.Parse(":irc.server quit :some message here");
   ASSERT_TRUE(ok);
   EXPECT_EQ(m.prefix(), "irc.server");
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "quit");
   EXPECT_EQ(m.nargs(), 1);
   EXPECT_EQ(m.arg(0), "some message here");
@@ -73,6 +79,7 @@ TEST(MessageTest, ParsePrefixedCommandAndArgs) {
   bool ok = m.Parse(":irc.server whois foo bar");
   ASSERT_TRUE(ok);
   EXPECT_EQ(m.prefix(), "irc.server");
+  EXPECT_TRUE(m.prefix_nick().empty());
   EXPECT_EQ(m.command(), "whois");
   EXPECT_EQ(m.nargs(), 2);
   EXPECT_EQ(m.arg(0), "foo");
@@ -84,6 +91,53 @@ TEST(MessageTest, ParsePrefixedCommandAndArgsAndTrailing) {
   bool ok = m.Parse(":irc.server whois foo bar :extra stuff");
   ASSERT_TRUE(ok);
   EXPECT_EQ(m.prefix(), "irc.server");
+  EXPECT_EQ(m.command(), "whois");
+  EXPECT_TRUE(m.prefix_nick().empty());
+  EXPECT_EQ(m.nargs(), 3);
+  EXPECT_EQ(m.arg(0), "foo");
+  EXPECT_EQ(m.arg(1), "bar");
+  EXPECT_EQ(m.arg(2), "extra stuff");
+}
+
+TEST(MessageTest, ParseNickPrefixedCommand) {
+  Message m;
+  bool ok = m.Parse(":nick!user@host quit");
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(m.prefix(), "nick!user@host");
+  EXPECT_EQ(m.prefix_nick(), "nick");
+  EXPECT_EQ(m.command(), "quit");
+  EXPECT_EQ(m.nargs(), 0);
+}
+
+TEST(MessageTest, ParseNickPrefixedCommandAndTrailing) {
+  Message m;
+  bool ok = m.Parse(":nick!user@host quit :some message here");
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(m.prefix(), "nick!user@host");
+  EXPECT_EQ(m.prefix_nick(), "nick");
+  EXPECT_EQ(m.command(), "quit");
+  EXPECT_EQ(m.nargs(), 1);
+  EXPECT_EQ(m.arg(0), "some message here");
+}
+
+TEST(MessageTest, ParseNickPrefixedCommandAndArgs) {
+  Message m;
+  bool ok = m.Parse(":nick!user@host whois foo bar");
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(m.prefix(), "nick!user@host");
+  EXPECT_EQ(m.prefix_nick(), "nick");
+  EXPECT_EQ(m.command(), "whois");
+  EXPECT_EQ(m.nargs(), 2);
+  EXPECT_EQ(m.arg(0), "foo");
+  EXPECT_EQ(m.arg(1), "bar");
+}
+
+TEST(MessageTest, ParseNickPrefixedCommandAndArgsAndTrailing) {
+  Message m;
+  bool ok = m.Parse(":nick!user@host whois foo bar :extra stuff");
+  ASSERT_TRUE(ok);
+  EXPECT_EQ(m.prefix(), "nick!user@host");
+  EXPECT_EQ(m.prefix_nick(), "nick");
   EXPECT_EQ(m.command(), "whois");
   EXPECT_EQ(m.nargs(), 3);
   EXPECT_EQ(m.arg(0), "foo");
@@ -119,50 +173,6 @@ TEST(MessageTest, ParseExtraSpaces) {
   EXPECT_EQ(m.nargs(), 2);
   EXPECT_EQ(m.arg(0), "baz\tquux");
   EXPECT_EQ(m.arg(1), "  huh");
-}
-
-// Parsing of the prefix nick!user@host parts.
-
-TEST(MessageTest, ParsePrefixNick) {
-  Message m;
-  bool ok = m.Parse(":nick!user@host PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_EQ(m.prefix_nick(), "nick");
-}
-
-TEST(MessageTest, ParsePrefixNick_NoSep1) {
-  Message m;
-  bool ok = m.Parse(":something@host PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_TRUE(m.prefix_nick().empty());
-}
-
-TEST(MessageTest, ParsePrefixNick_NoSep2) {
-  Message m;
-  bool ok = m.Parse(":nick!something PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_TRUE(m.prefix_nick().empty());
-}
-
-TEST(MessageTest, ParsePrefixNick_EmptyUser) {
-  Message m;
-  bool ok = m.Parse(":nick!@host PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_TRUE(m.prefix_nick().empty());
-}
-
-TEST(MessageTest, ParsePrefixNick_EmptyHost) {
-  Message m;
-  bool ok = m.Parse(":nick!user@ PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_TRUE(m.prefix_nick().empty());
-}
-
-TEST(MessageTest, ParsePrefixNick_EmptyUserHost) {
-  Message m;
-  bool ok = m.Parse(":nick!@ PRIVMSG :hey");
-  ASSERT_TRUE(ok);
-  EXPECT_TRUE(m.prefix_nick().empty());
 }
 
 // Verify that we don't read past the given count.
