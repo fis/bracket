@@ -41,15 +41,14 @@ def com_google_googletest():
       sha256 = "0a0da4410cfb958f220ffe0f48f9119253f36f4dccde266552c86867c0487f20",
   )
 
-# protobuf (master @ ae55fd2cc, https://github.com/google/protobuf/commit/ae55fd2cc)
-# version past 699c0eb9c is required for well-known protos
+# protobuf (3.6.1)
 
 def com_google_protobuf():
   native.http_archive(
       name = "com_google_protobuf",
-      urls = ["https://github.com/google/protobuf/archive/ae55fd2cc52849004de21a7e26aed7bfe393eaed.zip"],
-      strip_prefix = "protobuf-ae55fd2cc52849004de21a7e26aed7bfe393eaed",
-      sha256 = "80e30ede3cdb3170f10e8ad572a0db934b5129a8d956f949ed80e430c62f8e00",
+      urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.6.1.zip"],
+      sha256 = "d7a221b3d4fb4f05b7473795ccea9e05dab3b8721f6286a95fffbffc2d926f8b",
+      strip_prefix = "protobuf-3.6.1",
   )
 
 # brotli (v1.0.2)
