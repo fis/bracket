@@ -1,5 +1,6 @@
 """External dependencies for the bracket library."""
 
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def bracket_repositories(
@@ -103,7 +104,7 @@ def org_brotli():
       sha256 = "c2cf2a16646b44771a4109bb21218c8e2d952babb827796eb8a800c1f94b7422",
   )
   # brotli build extension dependency
-  native.git_repository(
+  git_repository(
       name = "io_bazel_rules_go",
       remote = "https://github.com/bazelbuild/rules_go.git",
       tag = "0.5.5",
