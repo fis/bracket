@@ -86,7 +86,7 @@ void BotCore::Send(const Message& msg) {
   irc_->Send(msg);
 }
 
-void BotCore::MessageReceived(const irc::Message& msg) {
+void BotCore::RawReceived(const irc::Message& msg) {
   for (const auto& plugin : plugins_)
     plugin->MessageReceived(msg);
 

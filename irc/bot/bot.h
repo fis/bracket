@@ -35,7 +35,7 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
 
   int Run(const google::protobuf::Message& config);
 
-  void MessageReceived(const irc::Message& msg) override;
+  void RawReceived(const irc::Message& msg) override;
 
   void Send(const Message& msg) override;
   event::Loop* loop() override { return loop_; }
