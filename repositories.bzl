@@ -94,20 +94,14 @@ def net_zlib():
   # protobuf build dependency
   native.bind(name = "zlib", actual = "@net_zlib//:zlib")
 
-# brotli (1.0.2)
+# brotli (master @ 78e7bbc)
 
 def org_brotli():
   http_archive(
       name = "org_brotli",
-      urls = ["https://github.com/google/brotli/archive/v1.0.2.tar.gz"],
-      strip_prefix = "brotli-1.0.2",
-      sha256 = "c2cf2a16646b44771a4109bb21218c8e2d952babb827796eb8a800c1f94b7422",
-  )
-  # brotli build extension dependency
-  git_repository(
-      name = "io_bazel_rules_go",
-      remote = "https://github.com/bazelbuild/rules_go.git",
-      tag = "0.5.5",
+      urls = ["https://github.com/google/brotli/archive/78e7bbc3c34bb85ecc9a912929e8b3b224973b05.zip"],
+      strip_prefix = "brotli-78e7bbc3c34bb85ecc9a912929e8b3b224973b05",
+      sha256 = "ad2c0c901dffb4e21e2533f3159913cec6bf7bdc345ee7ea28b3dd0b4d67fce7",
   )
 
 # prometheus_cpp (master @ 743722db9, https://github.com/jupp0r/prometheus-cpp/blob/743722db9)
