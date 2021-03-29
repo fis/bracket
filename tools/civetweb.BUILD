@@ -26,6 +26,7 @@ cc_library(
         "src/md5.inl",
         "src/sha1.inl",
         "src/handle_form.inl",
+        "src/response.inl",
     ],
     visibility = ["//visibility:public"],
 )

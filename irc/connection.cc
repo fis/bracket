@@ -7,6 +7,8 @@
 #include <unordered_map>
 
 #include <openssl/err.h>
+#include <prometheus/counter.h>
+#include <prometheus/gauge.h>
 
 #include "base/log.h"
 #include "irc/connection.h"

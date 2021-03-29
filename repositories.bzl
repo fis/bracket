@@ -7,117 +7,115 @@ def bracket_repositories(
     omit_bazel_skylib=False,
     omit_boringssl=False,
     omit_civetweb=False,
+    omit_com_github_jupp0r_prometheus_cpp=False,
     omit_com_google_googletest=False,
     omit_com_google_protobuf=False,
-    omit_net_zlib=False,
     omit_org_brotli=False,
-    omit_prometheus_cpp=False):
+    omit_zlib=False):
   """Imports dependencies for bracket."""
-  if not omit_bazel_skylib:
+  if not omit_bazel_skylib and not native.existing_rule("bazel_skylib"):
     bazel_skylib()
-  if not omit_boringssl:
+  if not omit_boringssl and not native.existing_rule("boringssl"):
     boringssl()
-  if not omit_civetweb:
+  if not omit_civetweb and not native.existing_rule("civetweb"):
     civetweb()
-  if not omit_com_google_googletest:
+  if not omit_com_github_jupp0r_prometheus_cpp and not native.existing_rule("com_github_jupp0r_prometheus_cpp"):
+    com_github_jupp0r_prometheus_cpp()
+  if not omit_com_google_googletest and not native.existing_rule("com_google_googletest"):
     com_google_googletest()
-  if not omit_com_google_protobuf:
+  if not omit_com_google_protobuf and not native.existing_rule("com_google_protobuf"):
     com_google_protobuf()
-  if not omit_net_zlib:
-    net_zlib()
-  if not omit_org_brotli:
+  if not omit_org_brotli and not native.existing_rule("org_brotli"):
     org_brotli()
-  if not omit_prometheus_cpp:
-    prometheus_cpp()
+  if not omit_zlib and not native.existing_rule("zlib"):
+    zlib()
 
-# bazel-skylib (master @ 2169ae1, https://github.com/bazelbuild/bazel-skylib/commit/2169ae1)
+# bazel-skylib (1.0.3)
 
 def bazel_skylib():
   http_archive(
       name = "bazel_skylib",
-      urls = ["https://github.com/bazelbuild/bazel-skylib/archive/2169ae1c374aab4a09aa90e65efe1a3aad4e279b.tar.gz"],
-      strip_prefix = "bazel-skylib-2169ae1c374aab4a09aa90e65efe1a3aad4e279b",
-      sha256 = "bbccf674aa441c266df9894182d80de104cabd19be98be002f6d478aaa31574d",
+      urls = [
+          "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+          "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+      ],
+      sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
   )
 
-# boringssl (master-with-bazel @ e1fef81e, https://github.com/google/boringssl/commit/e1fef81e)
+# boringssl (main-with-bazel @ c958c57d, https://github.com/google/boringssl/commit/c958c57d)
 
 def boringssl():
   http_archive(
       name = "boringssl",
-      urls = ["https://github.com/google/boringssl/archive/e1fef81e8c1595c2b8db97b290d8a523bcd5bf73.zip"],
-      strip_prefix = "boringssl-e1fef81e8c1595c2b8db97b290d8a523bcd5bf73",
-      sha256 = "ef43718090fb464462c6bbcf2bf351c551ef711cff2bd35d9ca3b92064404888",
+      urls = ["https://github.com/google/boringssl/archive/c958c57d29dc1f7f6a0bdce8a37ea8e8c9244f23.zip"],
+      sha256 = "b353c54a6e5bb9c7f41637da8e04edfe6e3a7b1b1e087f09c6dfa77992f05e67",
+      strip_prefix = "boringssl-c958c57d29dc1f7f6a0bdce8a37ea8e8c9244f23",
   )
 
-# civetweb (1.9.1)
+# civetweb (1.13)
 
 def civetweb():
     http_archive(
         name = "civetweb",
-        urls = ["https://github.com/civetweb/civetweb/archive/v1.9.1.tar.gz"],
-        strip_prefix = "civetweb-1.9.1",
-        sha256 = "880d741724fd8de0ebc77bc5d98fa673ba44423dc4918361c3cd5cf80955e36d",
-        build_file = "@fi_zem_bracket//tools:BUILD.civetweb",
+        urls = ["https://github.com/civetweb/civetweb/archive/refs/tags/v1.13.zip"],
+        sha256 = "7f8f51f77751191e42699bc00da700eb96d299bea9a3903341ae8d9ae16af936",
+        strip_prefix = "civetweb-1.13",
+        build_file = "@fi_zem_bracket//tools:civetweb.BUILD",
     )
 
-# googletest (master @ 7b6561c56, https://github.com/google/googletest/commit/7b6561c56)
+# com_github_jupp0r_prometheus_cpp (0.12.2)
+
+def com_github_jupp0r_prometheus_cpp():
+    http_archive(
+        name = "com_github_jupp0r_prometheus_cpp",
+        urls = ["https://github.com/jupp0r/prometheus-cpp/archive/refs/tags/v0.12.2.zip"],
+        sha256 = "7cbf90b89a293b4db3ff92517deface71a2edd74df7146317f79ae2a6f8c4249",
+        strip_prefix = "prometheus-cpp-0.12.2",
+        repo_mapping = {"@net_zlib_zlib": "@zlib"},
+    )
+
+# googletest (v1.10.0)
 
 def com_google_googletest():
   http_archive(
       name = "com_google_googletest",
-      urls = ["https://github.com/google/googletest/archive/7b6561c56e353100aca8458d7bc49c4e0119bae8.zip"],
-      strip_prefix = "googletest-7b6561c56e353100aca8458d7bc49c4e0119bae8",
-      sha256 = "0a0da4410cfb958f220ffe0f48f9119253f36f4dccde266552c86867c0487f20",
+      urls = ["https://github.com/google/googletest/archive/refs/tags/release-1.10.0.zip"],
+      sha256 = "94c634d499558a76fa649edb13721dce6e98fb1e7018dfaeba3cd7a083945e91",
+      strip_prefix = "googletest-release-1.10.0",
   )
 
-# protobuf (3.7.0rc1)
+# protobuf (3.15.6)
 
 def com_google_protobuf():
   http_archive(
       name = "com_google_protobuf",
-      urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.7.0rc1.zip"],
-      sha256 = "7b10e7cafc4efa66e0e6b4df11fdaee30b43471ee2b8febc79159095ce71ab1b",
-      strip_prefix = "protobuf-3.7.0rc1",
+      urls = ["https://github.com/protocolbuffers/protobuf/archive/refs/tags/v3.15.6.zip"],
+      sha256 = "985bb1ca491f0815daad825ef1857b684e0844dc68123626a08351686e8d30c9",
+      strip_prefix = "protobuf-3.15.6",
   )
 
-# zlib (1.2.11)
-
-def net_zlib():
-  http_archive(
-      name = "net_zlib",
-      build_file = "@com_google_protobuf//:third_party/zlib.BUILD",
-      sha256 = "c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
-      strip_prefix = "zlib-1.2.11",
-      urls = ["https://zlib.net/zlib-1.2.11.tar.gz"],
-  )
-  # protobuf build dependency
-  native.bind(name = "zlib", actual = "@net_zlib//:zlib")
-
-# brotli (master @ 78e7bbc)
+# brotli (1.0.9)
 
 def org_brotli():
   http_archive(
       name = "org_brotli",
-      urls = ["https://github.com/google/brotli/archive/78e7bbc3c34bb85ecc9a912929e8b3b224973b05.zip"],
-      strip_prefix = "brotli-78e7bbc3c34bb85ecc9a912929e8b3b224973b05",
-      sha256 = "ad2c0c901dffb4e21e2533f3159913cec6bf7bdc345ee7ea28b3dd0b4d67fce7",
+      urls = ["https://github.com/google/brotli/archive/refs/tags/v1.0.9.zip"],
+      sha256 = "fe20057c1e5c4d0b4bd318732c0bcf330b4326b486419caf1b91c351a53c5599",
+      strip_prefix = "brotli-1.0.9",
   )
 
-# prometheus_cpp (master @ 743722db9, https://github.com/jupp0r/prometheus-cpp/blob/743722db9)
+# zlib (1.2.11)
 
-def prometheus_cpp():
-    http_archive(
-        name = "prometheus_cpp",
-        urls = ["https://github.com/jupp0r/prometheus-cpp/archive/743722db96465aa867bf569eb455ad82dab9f819.zip"],
-        strip_prefix = "prometheus-cpp-743722db96465aa867bf569eb455ad82dab9f819",
-        sha256 = "4bc6f736a60525789b6e1f9c22b842efca28ed9319f7635031b4e8443aebb502",
-    )
-    # Prometheus client data model using native Bazel proto rules
-    http_archive(
-        name = "prometheus_client_model",
-        urls = ["https://github.com/prometheus/client_model/archive/99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c.zip"],
-        strip_prefix = "client_model-99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c",
-        sha256 = "799ba403fa3879fcb60d6644d7583bd01cb3a4927c442211783c07f59ff99450",
-        build_file = "@fi_zem_bracket//tools:BUILD.prometheus_client_model",
-    )
+# Note: This is a custom fork of the com_google_protobuf zlib Bazel integration,
+# because com_github_jupp0r_prometheus_cpp has an incompatible version. It expects
+# @net_zlib_zlib//:z, while protobuf expects @zlib//:zlib. Due to the difference
+# in the target name, a simple repo_mapping directive isn't sufficient.
+
+def zlib():
+  http_archive(
+      name = "zlib",
+      urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+      sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
+      strip_prefix = "zlib-1.2.11",
+      build_file = "@fi_zem_bracket//tools:zlib.BUILD",
+  )

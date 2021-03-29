@@ -16,7 +16,7 @@ cc_library(
         ":config_cc_proto",
         "//base",
         "//event",
-        "@prometheus_cpp//:prometheus_cpp",
+        "@com_github_jupp0r_prometheus_cpp//core",
     ],
 )
 

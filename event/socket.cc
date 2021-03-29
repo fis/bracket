@@ -197,6 +197,7 @@ BasicSocket::BasicSocket(const Builder& opt, Family family, Watcher* watcher)
     connect_addr_ = &connect_addr_unix_->second;
 
     addr->sun_family = AF_UNIX;
+    // TODO: deal gracefully with the case where input is too long [-Wstringop-truncation]
     std::strncpy(addr->sun_path, opt.unix_.c_str(), sizeof addr->sun_path);
 
     connect_addr_->ai_family = AF_UNIX;

@@ -232,8 +232,8 @@ const char kClientOutlineBidi[] =
 
 // generator
 
-namespace pb = ::google::protobuf;
-namespace comp = pb::compiler;
+namespace gpb = ::google::protobuf;
+namespace comp = gpb::compiler;
 
 void WriteTemplate(const char* tmpl, const std::unordered_map<std::string, std::string>& params, std::ostringstream& out) {
   for (; *tmpl; ++tmpl) {
@@ -282,7 +282,7 @@ struct Method {
   bool resp_stream;
 };
 
-bool ParseMethod(const pb::MethodDescriptorProto& method, Method* out, std::ostringstream& err) {
+bool ParseMethod(const gpb::MethodDescriptorProto& method, Method* out, std::ostringstream& err) {
   out->params["method"] = method.name();
 
   if (!method.options().HasExtension(brpc::brpc)) {
@@ -307,7 +307,7 @@ bool ParseMethod(const pb::MethodDescriptorProto& method, Method* out, std::ostr
   return true;
 }
 
-void GenerateService(const pb::ServiceDescriptorProto& service, std::ostringstream& out, std::ostringstream& err) {
+void GenerateService(const gpb::ServiceDescriptorProto& service, std::ostringstream& out, std::ostringstream& err) {
   // parse
 
   std::unordered_map<std::string, std::string> params;
@@ -385,7 +385,7 @@ void GenerateService(const pb::ServiceDescriptorProto& service, std::ostringstre
       WriteTemplate(kClientOutlineBidi, m.params, out);
 }
 
-void GenerateFile(const pb::FileDescriptorProto& desc, comp::CodeGeneratorResponse* resp) {
+void GenerateFile(const gpb::FileDescriptorProto& desc, comp::CodeGeneratorResponse* resp) {
   // parse
 
   if (desc.service_size() == 0) {

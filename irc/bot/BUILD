@@ -17,7 +17,8 @@ cc_library(
         "//base",
         "//irc",
         "//proto:util",
-        "@prometheus_cpp//:prometheus_cpp",
+        "@com_github_jupp0r_prometheus_cpp//core",
+        "@com_github_jupp0r_prometheus_cpp//pull",
     ],
 )
 
