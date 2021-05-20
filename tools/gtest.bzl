@@ -1,4 +1,4 @@
-def cc_gtest(name, deps, srcs=[]):
+def cc_gtest(name, deps, srcs=[], **kwargs):
     if len(srcs) == 0: srcs = [name + ".cc"]
     native.cc_test(
         name = name,
@@ -7,4 +7,5 @@ def cc_gtest(name, deps, srcs=[]):
             "@com_google_googletest//:gtest",
             "@com_google_googletest//:gtest_main",
         ],
+        **kwargs
     )
