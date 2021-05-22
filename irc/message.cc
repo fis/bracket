@@ -7,6 +7,7 @@
 namespace irc {
 
 // TODO: consider leveraging RE2 for some of this
+// TODO: share code between the two constructors
 
 Message::Message(std::initializer_list<const char*> contents, const char* prefix) {
   if (prefix)
@@ -14,6 +15,24 @@ Message::Message(std::initializer_list<const char*> contents, const char* prefix
 
   const char* const* p = contents.begin();
   const char* const* end = contents.end();
+
+  if (p != end) {
+    command_.append(*p);
+    ++p;
+  }
+
+  while (p != end) {
+    args_.emplace_back(*p);
+    ++p;
+  }
+}
+
+Message::Message(std::initializer_list<std::string_view> contents, std::string_view prefix) {
+  if (!prefix.empty())
+    prefix_.append(prefix);
+
+  std::string_view const* p = contents.begin();
+  std::string_view const* end = contents.end();
 
   if (p != end) {
     command_.append(*p);
@@ -147,6 +166,17 @@ std::size_t Message::Write(unsigned char* buffer, std::size_t size) const {
 
   return at;
 }
+
+std::string_view Message::reply_target() const {
+  if (nargs() < 1 || arg(0).empty())
+    return std::string_view();
+  char sigil = arg(0)[0];
+  if (sigil == '#' || sigil == '!' || sigil == '+' || sigil == '&')
+    return arg(0);
+  else
+    return prefix_nick();
+}
+
 
 bool Message::EqualArg(std::string_view a, std::string_view b) {
   if (a.size() != b.size())

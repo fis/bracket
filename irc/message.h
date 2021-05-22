@@ -22,6 +22,9 @@ class Message {
   /** Constructs a message from C strings. */
   Message(std::initializer_list<const char*> contents, const char* prefix = nullptr);
 
+  /** Constructs a message from string_view objects. */
+  Message(std::initializer_list<std::string_view> contents, std::string_view prefix = std::string_view());
+
   /**
    * Updates the message contents by parsing an IRC protocol message.
    *
@@ -90,6 +93,8 @@ class Message {
 
   /** Returns the nick portion of the prefix, if it's in the `nick!user@host` form. Empty otherwise. */
   std::string_view prefix_nick() const { return prefix_nick_; }
+  /** Returns the reply target for a PRIVMSG type message: the channel it was sent to if public, the sender's nickname if private. */
+  std::string_view reply_target() const;
 
   /** Returns true if the command field matches (ASCII-case-insensitive) \p test. */
   bool command_is(const std::string& test) const { return EqualArg(command_, test); }
