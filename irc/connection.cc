@@ -131,6 +131,7 @@ void Connection::Start() {
   }
   socket_ = maybe_socket.ptr();
   socket_->Start();
+  state_ = kConnecting;
 }
 
 void Connection::Stop() {
@@ -146,9 +147,9 @@ void Connection::ConnectionOpen() {
     pass = &config_.password();
 
   if (pass)
-    Send({ "PASS", pass->c_str() });
-  Send({ "NICK", config_.nick().c_str() });
-  Send({ "USER", config_.user().c_str(), "0", "*", config_.realname().c_str() });
+    SendNow({ "PASS", pass->c_str() });
+  SendNow({ "NICK", config_.nick().c_str() });
+  SendNow({ "USER", config_.user().c_str(), "0", "*", config_.realname().c_str() });
 
   nick_ = config_.nick();
   alt_nick_ = 0;
@@ -244,9 +245,9 @@ void Connection::HandleMessage(const Message& message) {
     }
   } else if (message.command_is("433") || message.command_is("437")) {
     // ERR_NICKNAMEINUSE | ERR_UNAVAILRESOURCE -- try alt nick if registering, or restart nick regain timer
-    if (!registered_) {
+    if (state_ == kConnecting) {
       nick_ = config_.nick() + std::to_string(++alt_nick_);
-      Send({ "NICK", nick_.c_str() });
+      SendNow({ "NICK", nick_.c_str() });
     } else if (nick_regain_timer_ == event::kNoTimer) {
       nick_regain_timer_ = loop_->Delay(kNickRegainDelay, base::borrow(&nick_regain_timer_callback_));
     }
@@ -264,7 +265,7 @@ void Connection::HandleMessage(const Message& message) {
       readers_.Call(&Reader::NickChanged, nick_);
     }
   } else if (message.command_is("PING")) {
-    Send({ "PONG", message.nargs() == 1 ? message.arg(0).c_str() : config_.nick().c_str() });
+    SendNow({ "PONG", message.nargs() == 1 ? message.arg(0).c_str() : config_.nick().c_str() });
   }
 
   // pass to client
@@ -290,6 +291,12 @@ const std::unordered_map<std::string, int> extra_cost = {
 } // unnamed namespace
 
 void Connection::Send(const Message& message) {
+  if (state_ != kReady)
+    return;
+  SendNow(message);
+}
+
+void Connection::SendNow(const Message& message) {
   bool was_empty = write_queue_.empty();
 
   constexpr std::size_t kMaxContentSize = kMaxMessageSize - 2;
@@ -323,7 +330,6 @@ void Connection::Send(const Message& message) {
   if (metric_write_queue_bytes_)
     metric_write_queue_bytes_->Set(write_buffer_.size());
 
-  // TODO: don't try until a connection has been established
   if (was_empty)  // otherwise we're trying already
     Flush();
 }
@@ -475,10 +481,10 @@ void Connection::ConnectionLost(base::error_ptr error) {
       readers_.Call(&Reader::ChannelLeft, entry.first);
     entry.second = ChannelState::kKnown;
   }
-  if (registered_)
+  if (state_ == kReady)
     readers_.Call(&Reader::ConnectionLost, config_.servers(current_server_));
 
-  registered_ = false;
+  state_ = kDisconnected;
   nick_.clear();
 
   current_server_ = (current_server_ + 1) % config_.servers_size();
@@ -492,7 +498,7 @@ void Connection::ReconnectTimer() {
 }
 
 void Connection::Registered() {
-  registered_ = true;
+  state_ = kRegistered;
   readers_.Call(&Reader::NickChanged, nick_);
 
   if (nick_ != config_.nick() && nick_regain_timer_ == event::kNoTimer)
@@ -502,13 +508,14 @@ void Connection::Registered() {
 void Connection::AutoJoinTimer() {
   auto_join_timer_ = event::kNoTimer;
 
-  if (!registered_)
+  if (state_ != kRegistered)
     Registered();  // just assume it's okay
+  state_ = kReady;
 
   for (auto& entry : channels_) {
     if (entry.second == ChannelState::kKnown) {
       entry.second = ChannelState::kJoining;
-      Send({ "JOIN", entry.first.c_str() });
+      SendNow({ "JOIN", entry.first.c_str() });
     }
   }
 
@@ -519,7 +526,7 @@ void Connection::NickRegainTimer() {
   nick_regain_timer_ = event::kNoTimer;
   if (nick_ == config_.nick())
     return;  // already okay
-  Send({ "NICK", config_.nick().c_str() });
+  SendNow({ "NICK", config_.nick().c_str() });
 }
 
 } // namespace irc

@@ -114,9 +114,10 @@ class Connection : public event::Socket::Watcher {
   /**
    * Posts a message over the connection.
    *
-   * The message may or may not be sent immediately. If a connection has not been established,
-   * messages are always buffered internally. If there is an active connection, the message may be
-   * sent immediately, unless limited by the flood protection.
+   * If the connection isn't ready for use, messages may be dropped. This is to
+   * avoid the situation where a lot of messages end up queued, and would then
+   * be flushed to a channel after connectivity is restored. Further, flood
+   * control may delay messages even if the connection is ready.
    */
   void Send(const Message& message);
 
@@ -153,6 +154,26 @@ class Connection : public event::Socket::Watcher {
   /** Reconnect timer, active if `kIdle` after an error, but running. */
   event::TimerId reconnect_timer_ = event::kNoTimer;
 
+  /**
+   * Connection state enumeration.
+   *
+   * The connection is initially in the disconnected state, and may revert back
+   * to it if the existing socket dies. Once a socket is constructed, the
+   * connection moves to the connecting state, during which it performs the
+   * nickname registration and waits for the server to send the usual numerics
+   * that signal the connection is ready for use. At that point, the connection
+   * moves to the registered state, but still waits for a signal that it's a
+   * good time to join the auto-join channels. Once that has happened, the
+   * connection finally moves to the ready state.
+   */
+  enum State {
+    kDisconnected,
+    kConnecting,
+    kRegistered,
+    kReady,
+  };
+  /** Connection state. */
+  State state_ = kDisconnected;
   /** Server socket. */
   std::unique_ptr<event::Socket> socket_;
 
@@ -195,8 +216,6 @@ class Connection : public event::Socket::Watcher {
   /** If we're waiting for enough credits to send, id of the timer. */
   event::TimerId write_credit_timer_ = event::kNoTimer;
 
-  /** `true` once the registration (nick/user/pass) commands have been accepted. */
-  bool registered_ = false;
   /** Currently active nickname. May not match config_.nick() if unavailable. */
   std::string nick_;
   /** If nonzero, #nick_ is not the configured nick. The number is used as a suffix. */
@@ -226,6 +245,15 @@ class Connection : public event::Socket::Watcher {
   void CanRead() override;
   /** Called when the server socket is ready to write to. */
   void CanWrite() override;
+
+  /**
+   * Posts a message over the connection.
+   *
+   * The message may or may not be sent immediately. If a connection has not been established,
+   * messages are always buffered internally. If there is an active connection, the message may be
+   * sent immediately, unless limited by the flood protection.
+   */
+  void SendNow(const Message& message);
   /** Tries to flush as much of the send buffer as possible. */
   void Flush();
 
