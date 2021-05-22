@@ -28,11 +28,12 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
  public:
   explicit BotCore(event::Loop* loop);
 
-  template <typename F>
-  void RegisterPlugin(const std::string& type, F factory) {
+  using PluginFactory = std::function<std::unique_ptr<Plugin>(const google::protobuf::Message& config, PluginHost* host)>;
+  void RegisterPlugin(const std::string& type, PluginFactory&& factory) {
     plugin_registry_.try_emplace(type, factory);
   }
 
+  void Start(const google::protobuf::Message& config);
   int Run(const google::protobuf::Message& config);
 
   void RawReceived(const irc::Message& msg) override;
@@ -42,7 +43,6 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
   prometheus::Registry* metric_registry() override { return metric_registry_.get(); }
 
  private:
-  using PluginFactory = std::function<std::unique_ptr<Plugin>(const google::protobuf::Message& config, PluginHost* host)>;
   std::unordered_map<std::string, PluginFactory> plugin_registry_;
 
   event::Loop* loop_;
@@ -70,6 +70,23 @@ class Bot {
         });
   }
 
+  template <typename PluginConfigProto>
+  void RegisterPlugin(std::function<std::unique_ptr<Plugin>(const PluginConfigProto& config, PluginHost* host)>&& factory) {
+    core_.RegisterPlugin(
+      PluginConfigProto::descriptor()->full_name(),
+        [f{std::move(factory)}](const google::protobuf::Message& config, PluginHost* host) -> std::unique_ptr<Plugin> {
+          return f(static_cast<const PluginConfigProto&>(config), host);
+        });
+  }
+
+  void Start(const google::protobuf::Message& config) {
+    core_.Start(config);
+  }
+
+  int Run(const google::protobuf::Message& config) {
+    return core_.Run(config);
+  }
+
   template <typename ConfigProto>
   int Main(int argc, char** argv, event::Loop* loop = nullptr) {
     if (argc != 2) {
@@ -79,7 +96,7 @@ class Bot {
 
     ConfigProto config;
     proto::ReadText(argv[1], &config);
-    return core_.Run(config);
+    return Run(config);
   }
 
  private:

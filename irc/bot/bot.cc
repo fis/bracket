@@ -18,7 +18,7 @@ BotCore::BotCore(event::Loop* loop) {
   }
 }
 
-int BotCore::Run(const google::protobuf::Message& config) {
+void BotCore::Start(const google::protobuf::Message& config) {
   const irc::Config* irc_config = nullptr;
   const irc::bot::Config* bot_config = nullptr;
   std::vector<std::pair<const PluginFactory*, const google::protobuf::Message*>> plugin_configs;
@@ -76,6 +76,10 @@ int BotCore::Run(const google::protobuf::Message& config) {
   irc_ = std::make_unique<irc::Connection>(*irc_config, loop_, metric_registry_.get());
   irc_->AddReader(base::borrow(this));
   irc_->Start();
+}
+
+int BotCore::Run(const google::protobuf::Message& config) {
+  Start(config);
   loop_->Run();
   return 0;
 }
