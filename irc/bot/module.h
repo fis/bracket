@@ -15,17 +15,22 @@
 
 namespace irc::bot {
 
-struct ModuleHost {
+struct Connection {
   virtual void Send(const Message& message) = 0;
+  virtual const std::string& net() = 0;
+  virtual ~Connection() = default;
+};
+
+struct ModuleHost {
+  virtual Connection* conn(const std::string_view net) = 0;
   virtual event::Loop* loop() = 0;
   virtual prometheus::Registry* metric_registry() = 0;
   virtual ~ModuleHost() = default;
 };
 
-class Module {
- public:
-  virtual void MessageReceived(const Message& message);
-  virtual void MessageSent(const Message& message);
+struct Module {
+  virtual void MessageReceived(Connection* conn, const Message& message);
+  virtual void MessageSent(Connection* conn, const Message& message);
   virtual ~Module() = default;
 };
 

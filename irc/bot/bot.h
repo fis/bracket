@@ -15,6 +15,7 @@
 #include <prometheus/registry.h>
 
 #include "event/loop.h"
+#include "irc/bot/config.pb.h"
 #include "irc/connection.h"
 #include "irc/message.h"
 #include "irc/bot/module.h"
@@ -24,7 +25,7 @@ namespace irc::bot {
 
 namespace internal {
 
-class BotCore : public ModuleHost, public irc::Connection::Reader {
+class BotCore : public ModuleHost {
  public:
   explicit BotCore(event::Loop* loop);
 
@@ -36,13 +37,27 @@ class BotCore : public ModuleHost, public irc::Connection::Reader {
   void Start(const google::protobuf::Message& config);
   int Run(const google::protobuf::Message& config);
 
-  void RawReceived(const irc::Message& msg) override;
-
-  void Send(const Message& msg) override;
+  Connection* conn(const std::string_view net) override;
   event::Loop* loop() override { return loop_; }
   prometheus::Registry* metric_registry() override { return metric_registry_.get(); }
 
  private:
+  class BotConnection : public Connection, public irc::Connection::Reader {
+   public:
+    BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry);
+    void Send(const irc::Message& msg) override { core_->SendOn(this, msg); }
+    void RawReceived(const irc::Message& msg) override { core_->ReceiveOn(this, msg); }
+    const std::string& net() override { return net_; }
+   private:
+    BotCore* core_;
+    const std::string net_;
+    std::unique_ptr<irc::Connection> irc_;
+    friend class BotCore;
+  };
+
+  void SendOn(BotConnection* conn, const irc::Message& msg);
+  void ReceiveOn(BotConnection* conn, const irc::Message& msg);
+
   std::unordered_map<std::string, ModuleFactory> module_registry_;
 
   event::Loop* loop_;
@@ -51,8 +66,8 @@ class BotCore : public ModuleHost, public irc::Connection::Reader {
   std::unique_ptr<prometheus::Exposer> metric_exposer_;
   std::shared_ptr<prometheus::Registry> metric_registry_;
 
+  std::vector<std::unique_ptr<BotConnection>> conns_;
   std::vector<std::unique_ptr<Module>> modules_;
-  std::unique_ptr<irc::Connection> irc_;
 };
 
 } // namespace internal

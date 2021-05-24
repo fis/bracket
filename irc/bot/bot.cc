@@ -1,5 +1,8 @@
 #include <cerrno>
+#include <memory>
 #include <vector>
+
+#include <google/protobuf/reflection.h>
 
 #include "base/exc.h"
 #include "base/log.h"
@@ -19,13 +22,11 @@ BotCore::BotCore(event::Loop* loop) {
 }
 
 void BotCore::Start(const google::protobuf::Message& config) {
-  const irc::Config* irc_config = nullptr;
   const irc::bot::Config* bot_config = nullptr;
+  std::vector<const irc::bot::ConnectionConfig*> conn_configs;
   std::vector<std::pair<const ModuleFactory*, const google::protobuf::Message*>> module_configs;
 
-  if (config.GetDescriptor()->full_name() == irc::Config::descriptor()->full_name()) {
-    irc_config = static_cast<const irc::Config*>(&config);
-  } else if (config.GetDescriptor()->full_name() == irc::bot::Config::descriptor()->full_name()) {
+  if (config.GetDescriptor()->full_name() == irc::bot::Config::descriptor()->full_name()) {
     bot_config = static_cast<const irc::bot::Config*>(&config);
   } else {
     std::vector<const google::protobuf::FieldDescriptor*> fields;
@@ -36,29 +37,33 @@ void BotCore::Start(const google::protobuf::Message& config) {
       if (field->type() != google::protobuf::FieldDescriptor::TYPE_MESSAGE)
         continue;
 
-      if (field->message_type()->full_name() == irc::Config::descriptor()->full_name()) {
-        CHECK(!field->is_repeated());
-        irc_config = static_cast<const irc::Config*>(&reflection->GetMessage(config, field));
-      } else if (field->message_type()->full_name() == irc::bot::Config::descriptor()->full_name()) {
+      if (field->message_type()->full_name() == irc::bot::Config::descriptor()->full_name()) {
         CHECK(!field->is_repeated());
         bot_config = static_cast<const irc::bot::Config*>(&reflection->GetMessage(config, field));
+      } else if (field->message_type()->full_name() == irc::bot::ConnectionConfig::descriptor()->full_name()) {
+        if (field->is_repeated())
+          for (const auto& conn : reflection->GetRepeatedFieldRef<irc::bot::ConnectionConfig>(config, field))
+            conn_configs.emplace_back(&conn);
+        else
+          conn_configs.emplace_back(static_cast<const irc::bot::ConnectionConfig*>(&reflection->GetMessage(config, field)));
       } else {
         auto factory = module_registry_.find(field->message_type()->full_name());
         if (factory == module_registry_.end())
           continue;
-        if (field->is_repeated()) {
-          FATAL("TODO: repeated module fields");
-        } else {
+        if (field->is_repeated())
+          for (const auto& msg : reflection->GetRepeatedFieldRef<google::protobuf::Message>(config, field))
+            module_configs.emplace_back(&factory->second, &msg);
+        else
           module_configs.emplace_back(&factory->second, &reflection->GetMessage(config, field));
-        }
       }
     }
   }
 
-  if (!irc_config && bot_config && bot_config->has_irc())
-    irc_config = &bot_config->irc();
-  if (!irc_config)
-    throw base::Exception("could not find IRC connection configuration");
+  if (conn_configs.empty() && bot_config && bot_config->conns_size() > 0)
+    for (const auto& conn : bot_config->conns())
+      conn_configs.emplace_back(&conn);
+  if (conn_configs.empty())
+    throw base::Exception("could not find any connection configurations");
 
   if (bot_config) {
     if (!bot_config->metrics_addr().empty()) {
@@ -68,12 +73,19 @@ void BotCore::Start(const google::protobuf::Message& config) {
     }
   }
 
+  for (const ConnectionConfig* conn_config : conn_configs)
+    conns_.emplace_back(std::make_unique<BotConnection>(this, *conn_config, loop_, metric_registry()));
+
   for (const auto& module_config : module_configs) {
     auto module = (*module_config.first)(*module_config.second, this);
     modules_.push_back(std::move(module));
   }
+}
 
-  irc_ = std::make_unique<irc::Connection>(*irc_config, loop_, metric_registry_.get());
+BotCore::BotConnection::BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry)
+    : core_(core), net_(cfg.net())
+{
+  irc_ = std::make_unique<irc::Connection>(cfg.irc(), loop, metric_registry);
   irc_->AddReader(base::borrow(this));
   irc_->Start();
 }
@@ -84,16 +96,25 @@ int BotCore::Run(const google::protobuf::Message& config) {
   return 0;
 }
 
-void BotCore::Send(const Message& msg) {
-  for (const auto& module : modules_)
-    module->MessageSent(msg);
-  irc_->Send(msg);
+Connection* BotCore::conn(const std::string_view net) {
+  for (const auto& conn : conns_)
+    if (conn->net_ == net)
+      return conn.get();
+  return nullptr;
 }
 
-void BotCore::RawReceived(const irc::Message& msg) {
+void BotCore::SendOn(BotConnection* conn, const irc::Message& msg) {
   for (const auto& module : modules_)
-    module->MessageReceived(msg);
+    module->MessageSent(conn, msg);
 
+  conn->irc_->Send(msg);
+}
+
+void BotCore::ReceiveOn(BotConnection* conn, const irc::Message& msg) {
+  for (const auto& module : modules_)
+    module->MessageReceived(conn, msg);
+
+  // TODO: skip building debug string if logging not enabled
   std::string debug(msg.command());
   for (const std::string& arg : msg.args()) {
     debug += ' ';
