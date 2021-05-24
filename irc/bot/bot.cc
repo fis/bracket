@@ -21,7 +21,7 @@ BotCore::BotCore(event::Loop* loop) {
 void BotCore::Start(const google::protobuf::Message& config) {
   const irc::Config* irc_config = nullptr;
   const irc::bot::Config* bot_config = nullptr;
-  std::vector<std::pair<const PluginFactory*, const google::protobuf::Message*>> plugin_configs;
+  std::vector<std::pair<const ModuleFactory*, const google::protobuf::Message*>> module_configs;
 
   if (config.GetDescriptor()->full_name() == irc::Config::descriptor()->full_name()) {
     irc_config = static_cast<const irc::Config*>(&config);
@@ -43,13 +43,13 @@ void BotCore::Start(const google::protobuf::Message& config) {
         CHECK(!field->is_repeated());
         bot_config = static_cast<const irc::bot::Config*>(&reflection->GetMessage(config, field));
       } else {
-        auto factory = plugin_registry_.find(field->message_type()->full_name());
-        if (factory == plugin_registry_.end())
+        auto factory = module_registry_.find(field->message_type()->full_name());
+        if (factory == module_registry_.end())
           continue;
         if (field->is_repeated()) {
-          FATAL("TODO: repeated plugin fields");
+          FATAL("TODO: repeated module fields");
         } else {
-          plugin_configs.emplace_back(&factory->second, &reflection->GetMessage(config, field));
+          module_configs.emplace_back(&factory->second, &reflection->GetMessage(config, field));
         }
       }
     }
@@ -68,9 +68,9 @@ void BotCore::Start(const google::protobuf::Message& config) {
     }
   }
 
-  for (const auto& plugin_config : plugin_configs) {
-    auto plugin = (*plugin_config.first)(*plugin_config.second, this);
-    plugins_.push_back(std::move(plugin));
+  for (const auto& module_config : module_configs) {
+    auto module = (*module_config.first)(*module_config.second, this);
+    modules_.push_back(std::move(module));
   }
 
   irc_ = std::make_unique<irc::Connection>(*irc_config, loop_, metric_registry_.get());
@@ -85,14 +85,14 @@ int BotCore::Run(const google::protobuf::Message& config) {
 }
 
 void BotCore::Send(const Message& msg) {
-  for (const auto& plugin : plugins_)
-    plugin->MessageSent(msg);
+  for (const auto& module : modules_)
+    module->MessageSent(msg);
   irc_->Send(msg);
 }
 
 void BotCore::RawReceived(const irc::Message& msg) {
-  for (const auto& plugin : plugins_)
-    plugin->MessageReceived(msg);
+  for (const auto& module : modules_)
+    module->MessageReceived(msg);
 
   std::string debug(msg.command());
   for (const std::string& arg : msg.args()) {

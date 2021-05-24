@@ -17,20 +17,20 @@
 #include "event/loop.h"
 #include "irc/connection.h"
 #include "irc/message.h"
-#include "irc/bot/plugin.h"
+#include "irc/bot/module.h"
 #include "proto/util.h"
 
 namespace irc::bot {
 
 namespace internal {
 
-class BotCore : public PluginHost, public irc::Connection::Reader {
+class BotCore : public ModuleHost, public irc::Connection::Reader {
  public:
   explicit BotCore(event::Loop* loop);
 
-  using PluginFactory = std::function<std::unique_ptr<Plugin>(const google::protobuf::Message& config, PluginHost* host)>;
-  void RegisterPlugin(const std::string& type, PluginFactory&& factory) {
-    plugin_registry_.try_emplace(type, factory);
+  using ModuleFactory = std::function<std::unique_ptr<Module>(const google::protobuf::Message& config, ModuleHost* host)>;
+  void RegisterModule(const std::string& type, ModuleFactory&& factory) {
+    module_registry_.try_emplace(type, factory);
   }
 
   void Start(const google::protobuf::Message& config);
@@ -43,7 +43,7 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
   prometheus::Registry* metric_registry() override { return metric_registry_.get(); }
 
  private:
-  std::unordered_map<std::string, PluginFactory> plugin_registry_;
+  std::unordered_map<std::string, ModuleFactory> module_registry_;
 
   event::Loop* loop_;
   std::unique_ptr<event::Loop> private_loop_;
@@ -51,7 +51,7 @@ class BotCore : public PluginHost, public irc::Connection::Reader {
   std::unique_ptr<prometheus::Exposer> metric_exposer_;
   std::shared_ptr<prometheus::Registry> metric_registry_;
 
-  std::vector<std::unique_ptr<Plugin>> plugins_;
+  std::vector<std::unique_ptr<Module>> modules_;
   std::unique_ptr<irc::Connection> irc_;
 };
 
@@ -61,21 +61,21 @@ class Bot {
  public:
   explicit Bot(event::Loop* loop = nullptr) : core_(loop) {}
 
-  template <typename PluginConfigProto, typename PluginClass>
-  void RegisterPlugin() {
-    core_.RegisterPlugin(
-        PluginConfigProto::descriptor()->full_name(),
-        [](const google::protobuf::Message& config, PluginHost* host) -> std::unique_ptr<Plugin> {
-          return std::make_unique<PluginClass>(static_cast<const PluginConfigProto&>(config), host);
+  template <typename ModuleConfigProto, typename ModuleClass>
+  void RegisterModule() {
+    core_.RegisterModule(
+        ModuleConfigProto::descriptor()->full_name(),
+        [](const google::protobuf::Message& config, ModuleHost* host) -> std::unique_ptr<Module> {
+          return std::make_unique<ModuleClass>(static_cast<const ModuleConfigProto&>(config), host);
         });
   }
 
-  template <typename PluginConfigProto>
-  void RegisterPlugin(std::function<std::unique_ptr<Plugin>(const PluginConfigProto& config, PluginHost* host)>&& factory) {
-    core_.RegisterPlugin(
-      PluginConfigProto::descriptor()->full_name(),
-        [f{std::move(factory)}](const google::protobuf::Message& config, PluginHost* host) -> std::unique_ptr<Plugin> {
-          return f(static_cast<const PluginConfigProto&>(config), host);
+  template <typename ModuleConfigProto>
+  void RegisterModule(std::function<std::unique_ptr<Module>(const ModuleConfigProto& config, ModuleHost* host)>&& factory) {
+    core_.RegisterModule(
+      ModuleConfigProto::descriptor()->full_name(),
+        [f{std::move(factory)}](const google::protobuf::Message& config, ModuleHost* host) -> std::unique_ptr<Module> {
+          return f(static_cast<const ModuleConfigProto&>(config), host);
         });
   }
 

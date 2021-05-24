@@ -1,9 +1,9 @@
 /** \file
- * IRC bot plugin interface.
+ * IRC bot module interface.
  */
 
-#ifndef IRC_BOT_PLUGIN_H_
-#define IRC_BOT_PLUGIN_H_
+#ifndef IRC_BOT_MODULE_H_
+#define IRC_BOT_MODULE_H_
 
 #include <functional>
 
@@ -15,23 +15,23 @@
 
 namespace irc::bot {
 
-struct PluginHost {
+struct ModuleHost {
   virtual void Send(const Message& message) = 0;
   virtual event::Loop* loop() = 0;
   virtual prometheus::Registry* metric_registry() = 0;
-  virtual ~PluginHost() = default;
+  virtual ~ModuleHost() = default;
 };
 
-class Plugin {
+class Module {
  public:
   virtual void MessageReceived(const Message& message);
   virtual void MessageSent(const Message& message);
-  virtual ~Plugin() = default;
+  virtual ~Module() = default;
 };
 
 } // namespace irc::bot
 
-#endif // IRC_BOT_PLUGIN_H_
+#endif // IRC_BOT_MODULE_H_
 
 // Local Variables:
 // mode: c++

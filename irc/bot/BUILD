@@ -6,11 +6,11 @@ cc_library(
     name = "bot",
     srcs = [
         "bot.cc",
-        "plugin.cc",
+        "module.cc",
     ],
     hdrs = [
         "bot.h",
-        "plugin.h",
+        "module.h",
     ],
     deps = [
         ":config_cc_proto",
