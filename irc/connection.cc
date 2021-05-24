@@ -39,7 +39,7 @@ constexpr auto kNickRegainDelay = std::chrono::seconds(120);
 
 // TODO sort methods?
 
-Connection::Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry)
+Connection::Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
     : loop_(loop)
 {
   // configuration defaults
@@ -60,32 +60,32 @@ Connection::Connection(const Config& config, event::Loop* loop, prometheus::Regi
         .Name("irc_connection_up")
         .Help("Is the bot currently connected to an IRC server?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
     metric_sent_bytes_ = &prometheus::BuildCounter()
         .Name("irc_sent_bytes")
         .Help("How many bytes have been sent to the IRC server?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
     metric_sent_lines_ = &prometheus::BuildCounter()
         .Name("irc_sent_lines")
         .Help("How many lines (commands) have been sent to the IRC server?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
     metric_received_bytes_ = &prometheus::BuildCounter()
         .Name("irc_received_bytes")
         .Help("How many bytes have been received from the IRC server?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
     metric_received_lines_ = &prometheus::BuildCounter()
         .Name("irc_received_lines")
         .Help("How many lines (commands) have been received from the IRC server?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
     metric_write_queue_bytes_ = &prometheus::BuildGauge()
         .Name("irc_write_queue_bytes")
         .Help("How many bytes are pending in the write queue?")
         .Register(*metric_registry)
-        .Add({});
+        .Add(metric_labels);
   }
 }
 

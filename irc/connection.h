@@ -94,7 +94,7 @@ class Connection : public event::Socket::Watcher {
    * outlive the connection. If the optional \p metric_registry parameter is set, it must do
    * likewise.
    */
-  Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry = nullptr);
+  Connection(const Config& config, event::Loop* loop, prometheus::Registry* metric_registry = nullptr, const std::map<std::string, std::string>& metric_labels = std::map<std::string, std::string>());
 
   DISALLOW_COPY(Connection);
 

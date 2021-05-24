@@ -3,6 +3,7 @@
 #include <vector>
 
 #include <google/protobuf/reflection.h>
+#include <prometheus/registry.h>
 
 #include "base/exc.h"
 #include "base/log.h"
@@ -65,6 +66,7 @@ void BotCore::Start(const google::protobuf::Message& config) {
   if (conn_configs.empty())
     throw base::Exception("could not find any connection configurations");
 
+  std::map<std::string, std::string> metric_labels;
   if (bot_config) {
     if (!bot_config->metrics_addr().empty()) {
       metric_exposer_ = std::make_unique<prometheus::Exposer>(bot_config->metrics_addr());
@@ -73,8 +75,12 @@ void BotCore::Start(const google::protobuf::Message& config) {
     }
   }
 
-  for (const ConnectionConfig* conn_config : conn_configs)
-    conns_.emplace_back(std::make_unique<BotConnection>(this, *conn_config, loop_, metric_registry()));
+  for (const ConnectionConfig* conn_config : conn_configs) {
+    prometheus::Registry *registry = metric_registry();
+    if (registry)
+      metric_labels["net"] = conn_config->net();
+    conns_.emplace_back(std::make_unique<BotConnection>(this, *conn_config, loop_, registry, metric_labels));
+  }
 
   for (const auto& module_config : module_configs) {
     auto module = (*module_config.first)(*module_config.second, this);
@@ -82,10 +88,10 @@ void BotCore::Start(const google::protobuf::Message& config) {
   }
 }
 
-BotCore::BotConnection::BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry)
+BotCore::BotConnection::BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
     : core_(core), net_(cfg.net())
 {
-  irc_ = std::make_unique<irc::Connection>(cfg.irc(), loop, metric_registry);
+  irc_ = std::make_unique<irc::Connection>(cfg.irc(), loop, metric_registry, metric_labels);
   irc_->AddReader(base::borrow(this));
   irc_->Start();
 }

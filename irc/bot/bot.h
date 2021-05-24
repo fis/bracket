@@ -44,7 +44,7 @@ class BotCore : public ModuleHost {
  private:
   class BotConnection : public Connection, public irc::Connection::Reader {
    public:
-    BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry);
+    BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels);
     void Send(const irc::Message& msg) override { core_->SendOn(this, msg); }
     void RawReceived(const irc::Message& msg) override { core_->ReceiveOn(this, msg); }
     const std::string& net() override { return net_; }
