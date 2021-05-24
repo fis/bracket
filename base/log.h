@@ -92,6 +92,11 @@ class LogEvent<false> {
 
 } // namespace base
 
+/** Evaluates to true if logging is enabled at the given level. */
+#define LOG_ENABLED(level) \
+  (::base::LogLevel::level >= ::base::kMinAvailableLogLevel \
+   && ::base::Logger::Enabled(::base::LogLevel::level))
+
 /**
  * Starts a log event at the given level.
  *

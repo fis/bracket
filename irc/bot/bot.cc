@@ -114,13 +114,14 @@ void BotCore::ReceiveOn(BotConnection* conn, const irc::Message& msg) {
   for (const auto& module : modules_)
     module->MessageReceived(conn, msg);
 
-  // TODO: skip building debug string if logging not enabled
-  std::string debug(msg.command());
-  for (const std::string& arg : msg.args()) {
-    debug += ' ';
-    debug += arg;
+  if (LOG_ENABLED(DEBUG)) {
+    std::string debug(msg.command());
+    for (const std::string& arg : msg.args()) {
+      debug += ' ';
+      debug += arg;
+    }
+    LOG(DEBUG) << debug;
   }
-  LOG(DEBUG) << debug;
 }
 
 } // namespace irc::bot::internal
