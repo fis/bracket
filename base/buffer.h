@@ -321,6 +321,8 @@ class ring_buffer {
   std::size_t size() const noexcept { return used_; }
   /** Returns the amount of memory allocated for the queue. */
   std::size_t capacity() const noexcept { return size_; }
+  /** Returns the size of the longest contiguous block that could be pushed without reallocation. */
+  std::size_t free_cont() const noexcept;
 
   /** Accesses the `i`th byte of the queue, with 0 being the front. */
   byte& operator[](std::size_t i) noexcept { return data_[(first_byte_ + i) & (size_ - 1)]; }

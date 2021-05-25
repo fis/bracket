@@ -54,6 +54,17 @@ byte* ring_buffer::push_cont(std::size_t push_size) {
   }
 }
 
+std::size_t ring_buffer::free_cont() const noexcept {
+  if (empty())
+    return size_;
+
+  std::size_t end = (first_byte_ + used_) & (size_ - 1);
+  if (first_byte_ < end)
+    return size_ - end;
+  else
+    return first_byte_ - end;
+}
+
 byte_view ring_buffer::push_free() {
   if (used_ == size_) {
     std::size_t new_size = size_ << 1;

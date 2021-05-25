@@ -28,6 +28,7 @@ TEST(RingBufferTest, PushWrapAround) {
   auto d = buffer.push(14);
 
   EXPECT_EQ(buffer.size(), 14u);
+  EXPECT_EQ(buffer.free_cont(), 2u);
   EXPECT_TRUE(d.first.valid());
   EXPECT_EQ(d.first.data(), base);
   EXPECT_EQ(d.first.size(), 14u);
@@ -36,10 +37,12 @@ TEST(RingBufferTest, PushWrapAround) {
   buffer.pop(12);
 
   EXPECT_EQ(buffer.size(), 2u);
+  EXPECT_EQ(buffer.free_cont(), 2u);
 
   auto d2 = buffer.push(8);
 
   EXPECT_EQ(buffer.size(), 10u);
+  EXPECT_EQ(buffer.free_cont(), 6u);
   EXPECT_TRUE(d2.first.valid());
   EXPECT_EQ(d2.first.data(), base + 14);
   EXPECT_EQ(d2.first.size(), 2u);
