@@ -11,6 +11,7 @@
 #include <prometheus/gauge.h>
 
 #include "base/log.h"
+#include "irc/config.pb.h"
 #include "irc/connection.h"
 
 extern "C" {
@@ -50,9 +51,16 @@ Connection::Connection(const Config& config, event::Loop* loop, prometheus::Regi
   config_.set_reconnect_delay_ms(30000);
   config_.MergeFrom(config);
 
+  if (config_.has_sasl() && config_.sasl().mech() == SaslMechanism::PLAIN
+      && config_.sasl().pass().empty() && config_.pass().empty())
+    throw base::Exception("SASL PLAIN configured globally but password not provided");
+  for (const auto& server : config_.servers())
+    if (server.has_sasl() && server.sasl().mech() == SaslMechanism::PLAIN
+        && server.sasl().pass().empty() && server.pass().empty() && config.pass().empty())
+      throw base::Exception("SASL PLAIN configured for a server but password not provided");
   if (config_.nick().empty())
     throw base::Exception("IRC nickname not configured");
-  for (auto channel : config_.channels())
+  for (const auto& channel : config_.channels())
     channels_[channel] = ChannelState::kKnown;
 
   if (metric_registry) {
@@ -106,7 +114,8 @@ void Connection::Start() {
   if (current_server_ >= config_.servers_size())
     throw base::Exception("server configuration not found");
   const Config::Server& server = config_.servers(current_server_);
-  const TlsConfig* tls = server.has_tls() ? &server.tls() : nullptr;
+  const TlsConfig* tls = server.has_tls() ? &server.tls() : config_.has_tls() ? &config_.tls() : nullptr;
+  sasl_ = server.has_sasl() ? &server.sasl() : config_.has_sasl() ? &config_.sasl() : nullptr;
 
   event::Socket::Builder builder;
 
@@ -140,16 +149,18 @@ void Connection::Stop() {
 void Connection::ConnectionOpen() {
   LOG(INFO) << "connected to " << config_.servers(current_server_);
 
-  const std::string* pass = nullptr;
-  if (!config_.servers(current_server_).password().empty())
-    pass = &config_.servers(current_server_).password();
-  else if (!config_.password().empty())
-    pass = &config_.password();
+  pass_ = nullptr;
+  if (!config_.servers(current_server_).pass().empty())
+    pass_ = &config_.servers(current_server_).pass();
+  else if (!config_.pass().empty())
+    pass_ = &config_.pass();
 
-  if (pass)
-    SendNow({ "PASS", pass->c_str() });
-  SendNow({ "NICK", config_.nick().c_str() });
-  SendNow({ "USER", config_.user().c_str(), "0", "*", config_.realname().c_str() });
+  if (sasl_)
+    SendNow({ "CAP", "LS", "302" });
+  if (pass_)
+    SendNow({ "PASS", *pass_ });
+  SendNow({ "NICK", config_.nick() });
+  SendNow({ "USER", config_.user(), "0", "*", config_.realname() });
 
   nick_ = config_.nick();
   alt_nick_ = 0;
@@ -234,7 +245,34 @@ void Connection::CanRead() {
 void Connection::HandleMessage(const Message& message) {
   // standard actions
 
-  if (message.command_is("001")) {
+  if (message.command_is("CAP")) {
+    // CAP -- capability negotiation in progress
+    if (message.arg_is(1, "LS")) {
+      // CAP * LS -- capability negotiation response
+      if (message.arg_is(2, "*") && message.nargs() == 4) {
+        // CAP * LS * :... -- multiline capability reply with continuation lines expected, add to set
+        AddCaps(message.arg(3));
+      } else {
+        // CAP * LS ... -- final capability reply, add to set and then request caps or end negotiation
+        if (message.nargs() == 3)
+          AddCaps(message.arg(2));
+        ReqNeededCaps();
+      }
+    } else if (message.arg_is(1, "ACK") && message.nargs() == 3) {
+      // CAP * ACK :... -- successfully enabled requested capabilities, start auth or end negotiation
+      // TODO: this should really keep a set of requested capabilities and validate the ACK
+      EndCaps(true);
+    } else if (message.arg_is(1, "NAK") && message.nargs() == 3) {
+      // CAP * NAK :... -- failed to enable requested capabilities, end negotiation anyway
+      EndCaps(false);
+    }
+  } else if (sasl_ && message.command_is("AUTHENTICATE") && message.arg_is(0, "+")) {
+    RespondSasl();
+  } else if (message.command_is("902") || message.command_is("903") || message.command_is("904") || message.command_is("905") || message.command_is("906") || message.command_is("907")) {
+    // ERR_NICKLOCKED (902), RPL_SASLSUCCESS (903), ERR_SASLFAIL (904), ERR_SASLTOOLONG (905), ERR_SASLABORTED (906), ERR_SASLALREADY (907):
+    // success or terminal error codes of SASL authentication, finish the registration sequence
+    SendNow({ "CAP", "END" });
+  } else if (message.command_is("001")) {
     // RPL_WELCOME -- successful registration
     Registered();
   } if (message.command_is("376")) {
@@ -271,6 +309,102 @@ void Connection::HandleMessage(const Message& message) {
   // pass to client
 
   readers_.Call(&Reader::RawReceived, read_message_);
+}
+
+void Connection::AddCaps(const std::string& spec) {
+  // TODO FIXME parse caps
+}
+
+void Connection::ReqNeededCaps() {
+  if (sasl_)
+    SendNow({ "CAP", "REQ", "sasl" });
+  else
+    SendNow({ "CAP", "END" });
+}
+
+void Connection::EndCaps(bool ack) {
+  if (ack && sasl_)
+    StartSasl();
+  else
+    SendNow({ "CAP", "END" });
+}
+
+struct SaslMechInfo {
+  const char* names[SaslMechanism_ARRAYSIZE];
+  constexpr SaslMechInfo() : names{} {
+    names[SaslMechanism::PLAIN] = "PLAIN";
+    names[SaslMechanism::EXTERNAL] = "EXTERNAL";
+  }
+};
+constexpr static SaslMechInfo kSaslMechInfo;
+
+void Connection::StartSasl() {
+  SendNow({ "AUTHENTICATE", kSaslMechInfo.names[sasl_->mech()]});
+}
+
+// TODO: move into a utility
+static void EncodeB64(std::string* out, const std::string& in) {
+  static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+  auto tail = base::to_const_byte_view(in);
+  while (tail.size() >= 3) {
+    auto chunk = (std::uint32_t) tail[0] << 16 | (std::uint32_t) tail[1] << 8 | tail[2];
+    out->push_back(alphabet[chunk >> 18]);
+    out->push_back(alphabet[(chunk >> 12) & 0x3f]);
+    out->push_back(alphabet[(chunk >> 6) & 0x3f]);
+    out->push_back(alphabet[chunk & 0x3f]);
+    tail.pop_front(3);
+  }
+  if (tail.size() == 2) {
+    std::uint32_t chunk = (std::uint32_t) tail[0] << 10 | (std::uint32_t) tail[1] << 2;
+    out->push_back(alphabet[chunk >> 12]);
+    out->push_back(alphabet[(chunk >> 6) & 0x3f]);
+    out->push_back(alphabet[chunk & 0x3f]);
+    out->push_back('=');
+  } else if (tail.size() == 1) {
+    std::uint32_t chunk = (std::uint32_t) tail[0] << 4;
+    out->push_back(alphabet[chunk >> 6]);
+    out->push_back(alphabet[chunk & 0x3f]);
+    out->push_back('=');
+    out->push_back('=');
+  }
+}
+
+void Connection::RespondSasl() {
+  const std::string* authz = &sasl_->authz();
+  if (authz->empty())
+    authz = &config_.nick();
+
+  std::string resp;
+  switch (sasl_->mech()) {
+  case SaslMechanism::PLAIN:
+    {
+      const std::string* authc = &sasl_->authc();
+      if (authc->empty())
+        authc = authz;
+      const std::string* pass = &sasl_->pass();
+      if (pass->empty())
+        pass = pass_;
+      std::string combined;
+      combined.append(*authz);
+      combined.push_back(0);
+      combined.append(*authc);
+      combined.push_back(0);
+      combined.append(*pass);
+      EncodeB64(&resp, combined);
+    }
+    break;
+
+  case SaslMechanism::EXTERNAL:
+    EncodeB64(&resp, *authz);
+    break;
+
+  default:
+    resp = "*";
+    break;
+  }
+
+  SendNow({ "AUTHENTICATE", resp });
 }
 
 namespace {

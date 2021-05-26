@@ -3,7 +3,14 @@ syntax = "proto3";
 package irc;
 
 // IRC connection configuration.
+//
+// For the TLS and SASL settings, the presence of the message turns on the requested feature.
+// In other words, for plain TLS connectivity, it's sufficient to add a `tls {}` block.
+// Likewise, for SASL authentication using the default PLAIN mechanism, `sasl {}` is sufficient.
 message Config {
+  // Network name (informative).
+  string net = 1;
+
   // IRC server settings.
   message Server {
     // Host name (required).
@@ -11,45 +18,63 @@ message Config {
     // Port number or service name (required).
     string port = 2;
     // Password to use when logging in.
-    string password = 3;
+    string pass = 3;
     // TLS settings for the connection.
     TlsConfig tls = 4;
+    // SASL settings for the connection.
+    SaslConfig sasl = 5;
   }
-
-  // Network name (informative).
-  string network = 1;
 
   // List of servers to attempt to connect to (at least one required).
   repeated Server servers = 2;
 
   // Common password for all servers.
-  string password = 3;
+  string pass = 3;
   // Common TLS settings for all servers.
   TlsConfig tls = 4;
+  // Common SASL settings for all servers.
+  SaslConfig sasl = 5;
 
   // Preferred nick name.
-  string nick = 5;
+  string nick = 6;
   // User name for registration.
-  string user = 6;
+  string user = 7;
   // Real name for registration.
-  string realname = 7;
+  string realname = 8;
 
   // List of channels to join automatically after connecting.
-  repeated string channels = 8;
+  repeated string channels = 9;
 
   // Override for name resolution timeout.
-  int32 resolve_timeout_ms = 9;
+  int32 resolve_timeout_ms = 10;
   // Override for connect timeout.
-  int32 connect_timeout_ms = 10;
+  int32 connect_timeout_ms = 11;
   // Override for delay between reconnection attempts.
-  int32 reconnect_delay_ms = 11;
+  int32 reconnect_delay_ms = 12;
 }
 
 // TLS settings.
-// The presence of this message (even if empty) turns TLS on.
 message TlsConfig {
   // Client certificate file name.
   string client_cert = 1;
   // Client private key file name.
   string client_key = 2;
+}
+
+// SASL settings.
+message SaslConfig {
+  // Authentication mechanism, by default PLAIN.
+  SaslMechanism mech = 1;
+  // [PLAIN, EXTERNAL] SASL authorization identity, by default the selected nickname.
+  string authz = 2;
+  // [PLAIN] SASL authentication identity, by default the same as the authorization identity.
+  string authc = 3;
+  // [PLAIN] SASL password, by default the configured IRC server password. Set this instead to avoid issuing the PASS command unnecessarily.
+  string pass = 4;
+}
+
+// SASL authentication mechanisms.
+enum SaslMechanism {
+  PLAIN = 0;
+  EXTERNAL = 1;
 }

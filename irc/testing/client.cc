@@ -6,6 +6,7 @@
 #include "irc/config.pb.h"
 #include "irc/connection.h"
 #include "irc/message.h"
+#include "proto/util.h"
 
 class Reader : public irc::Connection::Reader {
   void RawReceived(const irc::Message& msg) override {
@@ -40,24 +41,13 @@ class Reader : public irc::Connection::Reader {
 };
 
 int main(int argc, char *argv[]) {
-#if 0
-  gflags::SetUsageMessage("IRC client library test");
-  gflags::ParseCommandLineFlags(&argc, &argv, true);
-#endif
-
-  if (argc < 3) {
-    std::cerr << "usage: client <host> <port> [tls]\n";
+  if (argc < 2) {
+    std::cerr << "usage: client <config>\n";
     return 1;
   }
 
   irc::Config config;
-  config.set_nick("test_client");
-  config.add_channels("#testchan");
-  irc::Config::Server* server = config.add_servers();
-  server->set_host(argv[1]);
-  server->set_port(argv[2]);
-  if (argc >= 4)
-    server->mutable_tls();
+  proto::ReadText(argv[1], &config);
 
   event::Loop loop;
   irc::Connection connection(config, &loop);

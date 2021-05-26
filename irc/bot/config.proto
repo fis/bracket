@@ -7,16 +7,9 @@ import "irc/config.proto";
 // IRC bot configuration.
 message Config {
   // IRC connection configuration.
-  // If you're using a custom configuration proto, this may also be a (repeated) field in it.
-  repeated ConnectionConfig conns = 1;
+  // If you're using a custom configuration proto, this may also be an (optionally repeated) field in it.
+  repeated irc.Config irc = 1;
   // Metrics address, e.g. "127.0.0.1:9980".
   // If this string is empty, Prometheus library isn't initialized.
   string metrics_addr = 2;
-}
-
-message ConnectionConfig {
-  // Network name.
-  string net = 1;
-  // IRC connection details.
-  irc.Config irc = 2;
 }

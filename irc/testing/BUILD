@@ -6,5 +6,6 @@ cc_binary(
         "//event",
         "//irc",
         "//irc:config_cc_proto",
+        "//proto:util",
     ],
 )

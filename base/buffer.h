@@ -145,6 +145,11 @@ using byte_view = byte_view_base<byte>;
 /** Instance of byte_view_base over immutable bytes. */
 using const_byte_view = byte_view_base<const byte>;
 
+/** Converts a C++ string to a mutable byte_view. */
+inline byte_view to_byte_view(std::string& s) { return byte_view{reinterpret_cast<byte*>(s.data()), s.size()}; }
+/** Converts a C++ string to a mutable byte_view. */
+inline const_byte_view to_const_byte_view(const std::string& s) { return const_byte_view{reinterpret_cast<const byte*>(s.data()), s.size()}; }
+
 /**
  * Automatically resizable ring buffer, for FIFO queues of bytes.
  *

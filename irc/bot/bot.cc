@@ -24,7 +24,7 @@ BotCore::BotCore(event::Loop* loop) {
 
 void BotCore::Start(const google::protobuf::Message& config) {
   const irc::bot::Config* bot_config = nullptr;
-  std::vector<const irc::bot::ConnectionConfig*> conn_configs;
+  std::vector<const irc::Config*> irc_configs;
   std::vector<std::pair<const ModuleFactory*, const google::protobuf::Message*>> module_configs;
 
   if (config.GetDescriptor()->full_name() == irc::bot::Config::descriptor()->full_name()) {
@@ -41,12 +41,12 @@ void BotCore::Start(const google::protobuf::Message& config) {
       if (field->message_type()->full_name() == irc::bot::Config::descriptor()->full_name()) {
         CHECK(!field->is_repeated());
         bot_config = static_cast<const irc::bot::Config*>(&reflection->GetMessage(config, field));
-      } else if (field->message_type()->full_name() == irc::bot::ConnectionConfig::descriptor()->full_name()) {
+      } else if (field->message_type()->full_name() == irc::Config::descriptor()->full_name()) {
         if (field->is_repeated())
-          for (const auto& conn : reflection->GetRepeatedFieldRef<irc::bot::ConnectionConfig>(config, field))
-            conn_configs.emplace_back(&conn);
+          for (const auto& conn : reflection->GetRepeatedFieldRef<irc::Config>(config, field))
+            irc_configs.emplace_back(&conn);
         else
-          conn_configs.emplace_back(static_cast<const irc::bot::ConnectionConfig*>(&reflection->GetMessage(config, field)));
+          irc_configs.emplace_back(static_cast<const irc::Config*>(&reflection->GetMessage(config, field)));
       } else {
         auto factory = module_registry_.find(field->message_type()->full_name());
         if (factory == module_registry_.end())
@@ -60,10 +60,10 @@ void BotCore::Start(const google::protobuf::Message& config) {
     }
   }
 
-  if (conn_configs.empty() && bot_config && bot_config->conns_size() > 0)
-    for (const auto& conn : bot_config->conns())
-      conn_configs.emplace_back(&conn);
-  if (conn_configs.empty())
+  if (irc_configs.empty() && bot_config && bot_config->irc_size() > 0)
+    for (const auto& conn : bot_config->irc())
+      irc_configs.emplace_back(&conn);
+  if (irc_configs.empty())
     throw base::Exception("could not find any connection configurations");
 
   std::map<std::string, std::string> metric_labels;
@@ -75,11 +75,11 @@ void BotCore::Start(const google::protobuf::Message& config) {
     }
   }
 
-  for (const ConnectionConfig* conn_config : conn_configs) {
+  for (const irc::Config* irc_config : irc_configs) {
     prometheus::Registry *registry = metric_registry();
     if (registry)
-      metric_labels["net"] = conn_config->net();
-    conns_.emplace_back(std::make_unique<BotConnection>(this, *conn_config, loop_, registry, metric_labels));
+      metric_labels["net"] = irc_config->net();
+    conns_.emplace_back(std::make_unique<BotConnection>(this, *irc_config, loop_, registry, metric_labels));
   }
 
   for (const auto& module_config : module_configs) {
@@ -88,10 +88,10 @@ void BotCore::Start(const google::protobuf::Message& config) {
   }
 }
 
-BotCore::BotConnection::BotConnection(BotCore* core, const ConnectionConfig& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
+BotCore::BotConnection::BotConnection(BotCore* core, const irc::Config& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
     : core_(core), net_(cfg.net())
 {
-  irc_ = std::make_unique<irc::Connection>(cfg.irc(), loop, metric_registry, metric_labels);
+  irc_ = std::make_unique<irc::Connection>(cfg, loop, metric_registry, metric_labels);
   irc_->AddReader(base::borrow(this));
   irc_->Start();
 }

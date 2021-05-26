@@ -132,6 +132,55 @@ class Connection : public event::Socket::Watcher {
   }
 
  private:
+  /** Called when the server socket has connected. */
+  void ConnectionOpen() override;
+  /** Called if the server socket fails to connect for any reason. */
+  void ConnectionFailed(base::error_ptr error) override;
+  /** Called when the server socket is ready to read from. */
+  void CanRead() override;
+  /** Called when the server socket is ready to write to. */
+  void CanWrite() override;
+
+  /**
+   * Posts a message over the connection.
+   *
+   * The message may or may not be sent immediately. If a connection has not been established,
+   * messages are always buffered internally. If there is an active connection, the message may be
+   * sent immediately, unless limited by the flood protection.
+   */
+  void SendNow(const Message& message);
+  /** Tries to flush as much of the send buffer as possible. */
+  void Flush();
+
+  /** Handles an incoming message. */
+  void HandleMessage(const Message& message);
+
+  /** Adds new capabilities to the capability set, as part of CAP LS or CAP NEW. */
+  void AddCaps(const std::string& spec);
+  /** Requests capabilities needed by the configuration, or concludes the capability negotiation. */
+  void ReqNeededCaps();
+  /** Finishes capability negotiation. */
+  void EndCaps(bool ack);
+  /** Starts SASL authentication sequence. */
+  void StartSasl();
+  /** Responds to a SASL "challenge" (the PLAIN and EXTERNAL mechanisms supported don't really have one). */
+  void RespondSasl();
+
+  /** Called by timer when there's enough credit to try writing. */
+  void WriteCreditTimer();
+
+  /** Reverts back to idle state and starts the reconnect timer. */
+  void ConnectionLost(base::error_ptr error);
+  /** Called when it's time to try automatically reconnecting. */
+  void ReconnectTimer();
+
+  /** Called when nick registration is successful. */
+  void Registered();
+  /** Callback to do actions (like autojoin) after connecting to a new server. */
+  void AutoJoinTimer();
+  /** Callback to attempt to regain the configured nickname. */
+  void NickRegainTimer();
+
   /** Maximum number of write credits. */
   static constexpr int kMaxWriteCredit = 10000;
 
@@ -139,6 +188,10 @@ class Connection : public event::Socket::Watcher {
   Config config_;
   /** Currently active server in the configuration. */
   int current_server_ = 0;
+  /** Relevant password for the currently selected server, if any. */
+  const std::string* pass_ = nullptr;
+  /** Relevant SASL configuration for the currently selected server, if any. */
+  const SaslConfig* sasl_ = nullptr;
 
   /** Looper used for scheduling and I/O. */
   event::Loop* loop_;
@@ -236,44 +289,6 @@ class Connection : public event::Socket::Watcher {
   std::unordered_map<std::string, ChannelState> channels_;
   /** If we're waiting to auto-join channels, id of the timer. */
   event::TimerId auto_join_timer_ = event::kNoTimer;
-
-  /** Called when the server socket has connected. */
-  void ConnectionOpen() override;
-  /** Called if the server socket fails to connect for any reason. */
-  void ConnectionFailed(base::error_ptr error) override;
-  /** Called when the server socket is ready to read from. */
-  void CanRead() override;
-  /** Called when the server socket is ready to write to. */
-  void CanWrite() override;
-
-  /**
-   * Posts a message over the connection.
-   *
-   * The message may or may not be sent immediately. If a connection has not been established,
-   * messages are always buffered internally. If there is an active connection, the message may be
-   * sent immediately, unless limited by the flood protection.
-   */
-  void SendNow(const Message& message);
-  /** Tries to flush as much of the send buffer as possible. */
-  void Flush();
-
-  /** Handles an incoming message. */
-  void HandleMessage(const Message& message);
-
-  /** Called by timer when there's enough credit to try writing. */
-  void WriteCreditTimer();
-
-  /** Reverts back to idle state and starts the reconnect timer. */
-  void ConnectionLost(base::error_ptr error);
-  /** Called when it's time to try automatically reconnecting. */
-  void ReconnectTimer();
-
-  /** Called when nick registration is successful. */
-  void Registered();
-  /** Callback to do actions (like autojoin) after connecting to a new server. */
-  void AutoJoinTimer();
-  /** Callback to attempt to regain the configured nickname. */
-  void NickRegainTimer();
 
   event::TimedM<Connection, &Connection::WriteCreditTimer> write_credit_timer_callback_{this};
   event::TimedM<Connection, &Connection::ReconnectTimer> reconnect_timer_callback_{this};
