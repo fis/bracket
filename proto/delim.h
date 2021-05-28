@@ -43,6 +43,14 @@ class DelimReader {
    */
   bool Skip();
 
+  /**
+   * Returns the number of bytes read from the stream so far.
+   *
+   * This includes bytes that had already been read before this object was constructed,
+   * if the reader was constructed on top of an existing stream.
+   */
+  std::uint64_t bytes() { return stream_->ByteCount(); }
+
  private:
   base::optional_ptr<google::protobuf::io::ZeroCopyInputStream> stream_;
 };
@@ -62,6 +70,14 @@ class DelimWriter {
 
   /** Writes \p message into the stream. */
   void Write(const google::protobuf::Message& message);
+
+  /**
+   * Returns the number of bytes written to the stream so far.
+   *
+   * This includes bytes that had already been written before this object was constructed,
+   * if the writer was constructed on top of an existing stream.
+   */
+  std::uint64_t bytes() { return stream_->ByteCount(); }
 
  private:
   base::optional_ptr<google::protobuf::io::ZeroCopyOutputStream> stream_;
