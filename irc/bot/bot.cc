@@ -88,14 +88,6 @@ void BotCore::Start(const google::protobuf::Message& config) {
   }
 }
 
-BotCore::BotConnection::BotConnection(BotCore* core, const irc::Config& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
-    : core_(core), net_(cfg.net())
-{
-  irc_ = std::make_unique<irc::Connection>(cfg, loop, metric_registry, metric_labels);
-  irc_->AddReader(base::borrow(this));
-  irc_->Start();
-}
-
 int BotCore::Run(const google::protobuf::Message& config) {
   Start(config);
   loop_->Run();
@@ -127,6 +119,82 @@ void BotCore::ReceiveOn(BotConnection* conn, const irc::Message& msg) {
       debug += arg;
     }
     LOG(DEBUG) << debug;
+  }
+}
+
+BotConnection::BotConnection(BotCore* core, const irc::Config& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels)
+    : core_(core), net_(cfg.net())
+{
+  irc_ = std::make_unique<irc::Connection>(cfg, loop, metric_registry, metric_labels);
+  irc_->AddReader(base::borrow(this));
+  irc_->Start();
+}
+
+bool BotConnection::on_channel(const std::string_view nick, const std::string_view chan) {
+  auto info = nicks_.find(nick);
+  return info != nicks_.end() && info->second->on_channel(chan);
+}
+
+void BotConnection::RawReceived(const irc::Message& msg) {
+  // TODO: implement periodic NAMES queries to handle desync
+
+  if (msg.command_is("JOIN") && msg.nargs() == 1) {
+    auto chan = &*chans_.emplace(msg.arg(0)).first;
+    TrackJoin(msg.prefix_nick(), chan);
+  } else if (msg.command_is("PART") && msg.nargs() >= 1) {
+    auto chan = &*chans_.emplace(msg.arg(0)).first;
+    TrackPart(msg.prefix_nick(), chan);
+  } else if (msg.command_is("353") && msg.nargs() == 4) {
+    auto chan = &*chans_.emplace(msg.arg(2)).first;
+    std::string_view tail = msg.arg(3);
+    while (!tail.empty()) {
+      while (tail.find_last_of(" @+", 0) == 0)
+        tail.remove_prefix(1);
+      std::string_view nick_name = tail;
+      if (auto sep = nick_name.find(' '); sep != nick_name.npos)
+        nick_name = nick_name.substr(0, sep);
+      if (nick_name.empty())
+        break;
+      TrackJoin(nick_name, chan);
+      tail.remove_prefix(nick_name.size());
+    }
+  }
+
+  core_->ReceiveOn(this, msg);
+
+  if (msg.command_is("NICK") && msg.nargs() == 1) {
+    if (auto old = nicks_.find(msg.prefix_nick()); old != nicks_.end()) {
+      std::unique_ptr<Nick> nick = std::move(old->second);
+      nicks_.erase(old);
+      nick->name = msg.arg(0);
+      nicks_.emplace(nick->name, std::move(nick));
+    } else {
+      auto nick = std::make_unique<Nick>(msg.prefix_nick());
+      nicks_.emplace(nick->name, std::move(nick));
+    }
+  } else if (msg.command_is("QUIT")) {
+    nicks_.erase(msg.prefix_nick());
+  }
+}
+
+void BotConnection::TrackJoin(const std::string_view nick_name, const std::string* chan) {
+  if (auto old = nicks_.find(nick_name); old != nicks_.end()) {
+    if (!old->second->on_channel(*chan))
+      old->second->chans.push_back(chan);
+  } else {
+    auto nick = std::make_unique<Nick>(nick_name);
+    nick->chans.push_back(chan);
+    nicks_.emplace(nick->name, std::move(nick));
+  }
+}
+
+void BotConnection::TrackPart(const std::string_view nick_name, const std::string* chan) {
+  if (auto old = nicks_.find(nick_name); old != nicks_.end()) {
+    auto& nick_chans = old->second->chans;
+    if (auto ex = std::find(nick_chans.begin(), nick_chans.end(), chan); ex != nick_chans.end())
+      nick_chans.erase(ex);
+    if (nick_chans.empty())
+      nicks_.erase(old);
   }
 }
 

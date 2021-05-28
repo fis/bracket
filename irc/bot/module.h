@@ -15,9 +15,15 @@
 
 namespace irc::bot {
 
+/** Represents a connection to an IRC network. */
 struct Connection {
+  /** Sends a message over this connection. */
   virtual void Send(const Message& message) = 0;
+  /** Tests whether a nickname is known to be on a channel. */
+  virtual bool on_channel(const std::string_view nick, const std::string_view chan) = 0;
+  /** Returns the configured network name for this connection. */
   virtual const std::string& net() = 0;
+
   virtual ~Connection() = default;
 };
 
@@ -25,6 +31,7 @@ struct ModuleHost {
   virtual Connection* conn(const std::string_view net) = 0;
   virtual event::Loop* loop() = 0;
   virtual prometheus::Registry* metric_registry() = 0;
+
   virtual ~ModuleHost() = default;
 };
 

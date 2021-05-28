@@ -25,6 +25,8 @@ namespace irc::bot {
 
 namespace internal {
 
+class BotConnection;
+
 class BotCore : public ModuleHost {
  public:
   explicit BotCore(event::Loop* loop);
@@ -37,24 +39,12 @@ class BotCore : public ModuleHost {
   void Start(const google::protobuf::Message& config);
   int Run(const google::protobuf::Message& config);
 
+  // ModuleHost
   Connection* conn(const std::string_view net) override;
   event::Loop* loop() override { return loop_; }
   prometheus::Registry* metric_registry() override { return metric_registry_.get(); }
 
  private:
-  class BotConnection : public Connection, public irc::Connection::Reader {
-   public:
-    BotConnection(BotCore* core, const irc::Config& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels);
-    void Send(const irc::Message& msg) override { core_->SendOn(this, msg); }
-    void RawReceived(const irc::Message& msg) override { core_->ReceiveOn(this, msg); }
-    const std::string& net() override { return net_; }
-   private:
-    BotCore* core_;
-    const std::string net_;
-    std::unique_ptr<irc::Connection> irc_;
-    friend class BotCore;
-  };
-
   void SendOn(BotConnection* conn, const irc::Message& msg);
   void ReceiveOn(BotConnection* conn, const irc::Message& msg);
 
@@ -68,6 +58,40 @@ class BotCore : public ModuleHost {
 
   std::vector<std::unique_ptr<BotConnection>> conns_;
   std::vector<std::unique_ptr<Module>> modules_;
+
+  friend class BotConnection;
+};
+
+class BotConnection : public Connection, public irc::Connection::Reader {
+ public:
+  BotConnection(BotCore* core, const irc::Config& cfg, event::Loop* loop, prometheus::Registry* metric_registry, const std::map<std::string, std::string>& metric_labels);
+  // Connection
+  void Send(const irc::Message& msg) override { core_->SendOn(this, msg); }
+  bool on_channel(const std::string_view nick, const std::string_view chan) override;
+  const std::string& net() override { return net_; }
+  // irc::Connection::Reader
+  void RawReceived(const irc::Message& msg) override;
+
+ private:
+  struct Nick {
+    Nick(const std::string_view n) : name(n) {}
+    bool on_channel(const std::string_view chan) { return std::find_if(chans.begin(), chans.end(), [chan](auto ch){ return *ch == chan; }) != chans.end(); }
+    std::string name;
+    std::vector<const std::string*> chans;
+  };
+
+  BotCore* core_;
+
+  void TrackJoin(const std::string_view nick_name, const std::string* chan);
+  void TrackPart(const std::string_view nick_name, const std::string* chan);
+
+  const std::string net_;
+  std::unordered_map<std::string_view, std::unique_ptr<Nick>> nicks_;
+  std::unordered_set<std::string> chans_;
+
+  std::unique_ptr<irc::Connection> irc_;
+
+  friend class BotCore;
 };
 
 } // namespace internal
