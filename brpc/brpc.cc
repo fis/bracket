@@ -142,7 +142,7 @@ void RpcCall::CanRead() {
       return;  // not ready to dispatch
     std::uint32_t method = read_buffer_.read_u32();
 
-    auto endpoint = dispatcher_->RpcOpen(method);
+    auto endpoint = dispatcher_->RpcOpen(this, method);
     if (!endpoint) {
       Close(base::make_error("RpcCall: invalid method code: " + std::to_string(method)));
       return;

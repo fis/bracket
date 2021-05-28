@@ -109,7 +109,16 @@ class Message {
   /** \overload */
   bool prefix_nick_is(const char* test) const { return EqualArg(prefix_nick_, test); }
 
+  /** Sets the prefix string. */
+  void set_prefix(const std::string& prefix) { prefix_ = prefix; UpdateNick(); }
+  /** Sets the command string. */
+  void set_command(const std::string& command) { command_ = command; }
+  /** Mutable accessor to the argument vector. */
+  std::vector<std::string>* mutable_args() { return &args_; }
+
  private:
+  void UpdateNick();
+
   std::string prefix_;
   std::string_view prefix_nick_;
   std::string command_;

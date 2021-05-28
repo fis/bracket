@@ -13,8 +13,9 @@ load("//brpc:brpc_library.bzl", "brpc_library")
 
 brpc_library(
     name = "echo_service_brpc",
-    src = "echo_service.proto",
-    deps = [":echo_service_cc_proto"],
+    proto_file = "echo_service.proto",
+    proto_deps = [":echo_service_proto"],
+    cc_deps = [":echo_service_cc_proto"],
 )
 
 load("//tools:gtest.bzl", "cc_gtest")

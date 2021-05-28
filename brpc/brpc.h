@@ -35,7 +35,7 @@ struct RpcEndpoint {
 
 /** Server-side dispatcher interface returning endpoints for incoming method calls. */
 struct RpcDispatcher {
-  virtual std::unique_ptr<RpcEndpoint> RpcOpen(std::uint32_t method) = 0;
+  virtual std::unique_ptr<RpcEndpoint> RpcOpen(RpcCall* call, std::uint32_t method) = 0;
   virtual void RpcError(base::error_ptr error) = 0;
 
   RpcDispatcher() = default;

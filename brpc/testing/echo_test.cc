@@ -28,7 +28,7 @@ class TestService : public EchoServiceInterface {
     return true;
   }
 
-  base::optional_ptr<EchoServiceInterface::StreamHandler> Stream() override {
+  base::optional_ptr<EchoServiceInterface::StreamHandler> Stream(StreamCall*) override {
     return base::borrow(&kStreamService);
   }
 

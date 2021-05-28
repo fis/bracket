@@ -62,14 +62,7 @@ bool Message::Parse(const unsigned char* data, std::size_t count) {
 
     std::size_t prefix_len = d - p;
     prefix_.append(p, prefix_len);
-
-    auto* n = static_cast<const char*>(std::memchr(p, '!', prefix_len));
-    if (n) {
-      std::size_t nick_len = n - p;
-      prefix_nick_ = std::string_view{prefix_.data(), nick_len};
-    } else {
-      prefix_nick_ = std::string_view{};
-    }
+    UpdateNick();
 
     p += prefix_len;
     left -= prefix_len;
@@ -121,6 +114,14 @@ bool Message::Parse(const unsigned char* data, std::size_t count) {
   }
 
   return true;
+}
+
+void Message::UpdateNick() {
+  auto len = prefix_.find('!');
+  if (len != prefix_.npos)
+    prefix_nick_ = std::string_view{prefix_.data(), len};
+  else
+    prefix_nick_ = std::string_view{};
 }
 
 std::size_t Message::Write(unsigned char* buffer, std::size_t size) const {

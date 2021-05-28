@@ -6,9 +6,10 @@
 #include <string>
 #include <unordered_set>
 
+#include <google/protobuf/descriptor.pb.h>
+#include <google/protobuf/compiler/plugin.pb.h>
+
 #include "brpc/options.pb.h"
-#include "google/protobuf/descriptor.pb.h"
-#include "google/protobuf/compiler/plugin.pb.h"
 
 // templates for code generation
 
@@ -41,6 +42,7 @@ const char kMethodCodeFooter[] =
     "};\n\n";
 
 const char kInterfaceHeader[] =
+    "class $service$Server;\n"
     "struct $service$Interface {\n";
 const char kInterfaceMethodHeader[] =
     "  // rpc $method$ ($reqStream$$reqType$) returns ($respStream$$respType$);\n";
@@ -56,24 +58,24 @@ const char kInterfaceMethodBidi[] =
     "  };\n"
     "  class $method$Call : public ::brpc::RpcEndpoint {\n"
     "   public:\n"
-    "    $method$Call(::base::optional_ptr<$method$Handler> handler) : handler_(::std::move(handler)) {}\n"
+    "    $method$Call(::brpc::RpcCall* call) : call_(call) {}\n"
     "    void Send(const $respType$& resp) { call_->Send(resp); }\n"
     "    void Close() { call_->Close(); }\n"
     "   private:\n"
     "    ::brpc::RpcCall* call_;\n"
     "    ::base::optional_ptr<$method$Handler> handler_;\n"
-    "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall* call) override;\n"
+    "    ::std::unique_ptr<::google::protobuf::Message> RpcOpen(::brpc::RpcCall*) override;\n"
     "    void RpcMessage(::brpc::RpcCall* call, const ::google::protobuf::Message& message) override;\n"
     "    void RpcClose(::brpc::RpcCall* call, ::base::error_ptr error) override;\n"
+    "    friend class $service$Server;\n"
     "  };\n"
-    "  virtual ::base::optional_ptr<$method$Handler> $method$() = 0;\n\n";
+    "  virtual ::base::optional_ptr<$method$Handler> $method$($method$Call* call) = 0;\n\n";
 const char kInterfaceFooter[] =
     "  virtual void $service$Error(::base::error_ptr error) = 0;\n\n"
     "  virtual ~$service$Interface() = default;\n"
     "};\n\n";
 const char kInterfaceOutlineBidi[] =
-    "inline ::std::unique_ptr<::google::protobuf::Message> $service$Interface::$method$Call::RpcOpen(::brpc::RpcCall* call) {\n"
-    "  call_ = call;\n"
+    "inline ::std::unique_ptr<::google::protobuf::Message> $service$Interface::$method$Call::RpcOpen(::brpc::RpcCall*) {\n"
     "  handler_->$method$Open(this);\n"
     "  return ::std::make_unique<$reqType$>();\n"
     "}\n\n"
@@ -103,7 +105,7 @@ const char kServerEndpointSimple[] =
 const char kServerBody[] =
     "  ::brpc::RpcServer server_;\n"
     "  ::base::optional_ptr<$service$Interface> impl_;\n"
-    "  ::std::unique_ptr<::brpc::RpcEndpoint> RpcOpen(::std::uint32_t method) override;\n"
+    "  ::std::unique_ptr<::brpc::RpcEndpoint> RpcOpen(::brpc::RpcCall* call, ::std::uint32_t method) override;\n"
     "  void RpcError(::base::error_ptr error) override;\n"
     "};\n\n";
 const char kServerOutlineSimple[] =
@@ -120,7 +122,7 @@ const char kServerOutlineSimple[] =
     "  if (error) impl_->$service$Error(::std::move(error));\n"
     "}\n\n";
 const char kServerDispatcherHeader[] =
-    "inline ::std::unique_ptr<::brpc::RpcEndpoint> $service$Server::RpcOpen(::std::uint32_t method) {\n"
+    "inline ::std::unique_ptr<::brpc::RpcEndpoint> $service$Server::RpcOpen(::brpc::RpcCall* call, ::std::uint32_t method) {\n"
     "  switch (method) {\n";
 const char kServerDispatcherMethodHeader[] =
     "    case $service$Method::k$method$:\n";
@@ -128,10 +130,12 @@ const char kServerDispatcherMethodSimple[] =
     "      return ::std::make_unique<$method$Endpoint>(impl_.get());\n";
 const char kServerDispatcherMethodBidi[] =
     "      {\n"
-    "        auto handler = impl_->$method$();\n"
-    "        if (handler)\n"
-    "          return ::std::make_unique<$service$Interface::$method$Call>(std::move(handler));\n"
-    "        else\n"
+    "        auto call_wrapper = ::std::make_unique<$service$Interface::$method$Call>(call);\n"
+    "        auto handler = impl_->$method$(call_wrapper.get());\n"
+    "        if (handler) {\n"
+    "          call_wrapper->handler_ = ::std::move(handler);\n"
+    "          return ::std::move(call_wrapper);\n"
+    "        } else\n"
     "          return nullptr;\n"
     "      }\n";
 const char kServerDispatcherFooter[] =

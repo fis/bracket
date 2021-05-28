@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package irc.bot;
+
+import "brpc/options.proto";
+import "google/protobuf/empty.proto";
+
+// Bot module configuration for the remote control service.
+message RemoteConfig {
+  // Unix domain socket to serve at.
+  string socket_path = 1;
+}
+
+// IRC bot remote control / worker service.
+service RemoteService {
+  // Follow all input and output on (a specific or all) IRC connections.
+  rpc Watch (stream WatchRequest) returns (stream IrcEvent) { option (brpc.brpc).code = 0; }
+  // Send out a message over a connection.
+  rpc SendTo (SendToRequest) returns (google.protobuf.Empty) { option (brpc.brpc).code = 1; }
+}
+
+// Request to watch traffic flowing on an IRC connection.
+message WatchRequest {
+  // Network to watch for. If the message is sent more than once, it replaces the existing list.
+  repeated string nets = 1;
+}
+
+// Request to send a message as if it originated from the bot.
+message SendToRequest {
+  // IRC network to send to.
+  string net = 1;
+  // Message contents to send. The direction need not be set.
+  IrcEvent event = 2;
+}
+
+message IrcEvent {
+  // Prefix of the IRC message, without the leading ':'.
+  bytes prefix = 1;
+  // The command or the numeric portion.
+  bytes command = 2;
+  // The command parameters. Whether the last parameter had a leading ':' is not
+  // indicated, though if it contains any space characters, it must have had.
+  repeated bytes args = 3;
+  // Possible direction flag values, where relevant.
+  enum Direction {
+    // Received by the client. Default value.
+    RECEIVED = 0;
+    // Sent by the client.
+    SENT = 1;
+  }
+  // Message direction (from the client's perspective), if relevant.
+  // This need not be set when there's no choice, e.g., when used to send an event.
+  Direction direction = 4;
+}
