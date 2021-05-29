@@ -138,12 +138,15 @@ bool BotConnection::on_channel(const std::string_view nick, const std::string_vi
 void BotConnection::RawReceived(const irc::Message& msg) {
   // TODO: implement periodic NAMES queries to handle desync
 
-  if (msg.command_is("JOIN") && msg.nargs() == 1) {
+  if (msg.command_is("JOIN") && msg.nargs() == 1 && !msg.prefix_nick().empty()) {
     auto chan = &*chans_.emplace(msg.arg(0)).first;
     TrackJoin(msg.prefix_nick(), chan);
-  } else if (msg.command_is("PART") && msg.nargs() >= 1) {
+  } else if (msg.command_is("PART") && msg.nargs() >= 1 && !msg.prefix_nick().empty()) {
     auto chan = &*chans_.emplace(msg.arg(0)).first;
     TrackPart(msg.prefix_nick(), chan);
+  } else if (msg.command_is("KICK") && msg.nargs() >= 2) {
+    auto chan = &*chans_.emplace(msg.arg(0)).first;
+    TrackPart(msg.arg(1), chan);
   } else if (msg.command_is("353") && msg.nargs() == 4) {
     auto chan = &*chans_.emplace(msg.arg(2)).first;
     std::string_view tail = msg.arg(3);
@@ -162,7 +165,7 @@ void BotConnection::RawReceived(const irc::Message& msg) {
 
   core_->ReceiveOn(this, msg);
 
-  if (msg.command_is("NICK") && msg.nargs() == 1) {
+  if (msg.command_is("NICK") && msg.nargs() == 1 && !msg.prefix_nick().empty()) {
     if (auto old = nicks_.find(msg.prefix_nick()); old != nicks_.end()) {
       std::unique_ptr<Nick> nick = std::move(old->second);
       nicks_.erase(old);
@@ -172,7 +175,7 @@ void BotConnection::RawReceived(const irc::Message& msg) {
       auto nick = std::make_unique<Nick>(msg.prefix_nick());
       nicks_.emplace(nick->name, std::move(nick));
     }
-  } else if (msg.command_is("QUIT")) {
+  } else if (msg.command_is("QUIT") && !msg.prefix_nick().empty()) {
     nicks_.erase(msg.prefix_nick());
   }
 }
